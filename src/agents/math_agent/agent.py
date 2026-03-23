@@ -1,9 +1,8 @@
-from langchain_core.messages import AIMessage, SystemMessage
+from langchain_core.messages import AIMessage, ToolMessage, SystemMessage
 from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
-from langgraph.prebuilt import ToolNode
 
 from src.logging import get_logger, log_node
 from src.state import State, WorkerState
@@ -34,6 +33,7 @@ def divide(a: float, b: float) -> str:
 
 
 MATH_TOOLS = [add, multiply, divide]
+MATH_TOOLS_BY_NAME = {t.name: t for t in MATH_TOOLS}
 
 
 def build_math_agent() -> CompiledStateGraph:
@@ -70,6 +70,40 @@ def build_math_agent() -> CompiledStateGraph:
 
         return {"messages": [response]}
 
+    @log_node("math_tool_executor")
+    def tool_executor_node(state: WorkerState) -> dict:
+        """tool_calls를 실행하고 결과를 ToolMessage로 반환한다."""
+        last_message = state["messages"][-1]
+        tool_calls = getattr(last_message, "tool_calls", [])
+
+        results: list[ToolMessage] = []
+        for tc in tool_calls:
+            tool_fn = MATH_TOOLS_BY_NAME.get(tc["name"])
+            if tool_fn is None:
+                logger.error("알 수 없는 tool: %s", tc["name"])
+                results.append(ToolMessage(
+                    content=f"오류: 알 수 없는 tool '{tc['name']}'",
+                    tool_call_id=tc["id"],
+                ))
+                continue
+
+            logger.info("tool 실행: %s(%s)", tc["name"], tc["args"])
+            try:
+                result = tool_fn.invoke(tc["args"])
+                logger.info("tool 결과: %s → %s", tc["name"], result)
+                results.append(ToolMessage(
+                    content=str(result),
+                    tool_call_id=tc["id"],
+                ))
+            except Exception:
+                logger.error("tool 실행 실패: %s", tc["name"], exc_info=True)
+                results.append(ToolMessage(
+                    content=f"오류: {tc['name']} 실행 중 예외 발생",
+                    tool_call_id=tc["id"],
+                ))
+
+        return {"messages": results}
+
     def should_continue(state: WorkerState) -> str:
         last_message = state["messages"][-1]
         has_tool_calls = bool(getattr(last_message, "tool_calls", None))
@@ -80,10 +114,9 @@ def build_math_agent() -> CompiledStateGraph:
         return decision
 
     graph = StateGraph(WorkerState)
-    tool_node = ToolNode(MATH_TOOLS)
 
     graph.add_node("agent", math_agent_node)
-    graph.add_node("tools", tool_node)
+    graph.add_node("tools", tool_executor_node)
 
     graph.add_edge(START, "agent")
     graph.add_conditional_edges("agent", should_continue, ["tools", END])
