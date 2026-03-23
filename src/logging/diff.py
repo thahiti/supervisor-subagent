@@ -28,12 +28,16 @@ def _try_parse_json(text: str) -> str | None:
 
 
 def _format_content(content: str, indent: str) -> str:
-    """메시지 content를 읽기 좋게 포맷한다."""
+    """메시지 content를 그대로 출력한다.
+
+    JSON이면 파싱하여 들여쓰기, 아니면 원문 그대로 출력.
+    여러 줄이거나 긴 텍스트는 줄바꿈 후 들여쓰기한다.
+    """
     json_str = _try_parse_json(content)
     if json_str:
         return "\n" + textwrap.indent(json_str, indent)
 
-    if len(content) > 80 or "\n" in content:
+    if "\n" in content:
         return "\n" + textwrap.indent(content, indent)
 
     return content
