@@ -34,17 +34,13 @@ def translate_agent_node(state: WorkerState) -> dict:
     return {"messages": [response]}
 
 
-@log_node("translate_wrapper")
 def translate_wrapper(state: State) -> dict:
     """번역 에이전트를 실행하고 completed_agents를 업데이트한다."""
-    logger.info("번역 에이전트 실행 시작")
     result = translate_agent_node({"messages": state["messages"]})
 
     last_message = result["messages"][-1]
     completed = list(state.get("completed_agents", []))
     completed.append("translate")
-
-    logger.info("번역 완료. 결과: %s", str(last_message.content)[:200])
 
     return {
         "messages": [AIMessage(content=f"[번역 결과]\n{last_message.content}")],

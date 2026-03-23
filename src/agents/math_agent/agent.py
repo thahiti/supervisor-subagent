@@ -95,10 +95,8 @@ def build_math_agent() -> CompiledStateGraph:
 math_subgraph = build_math_agent()
 
 
-@log_node("math_wrapper")
 def math_wrapper(state: State) -> dict:
     """수학 에이전트 서브그래프를 실행하고 completed_agents를 업데이트한다."""
-    logger.info("서브그래프 실행 시작")
     try:
         result = math_subgraph.invoke({"messages": state["messages"]})
     except Exception:
@@ -108,8 +106,6 @@ def math_wrapper(state: State) -> dict:
     last_message = result["messages"][-1]
     completed = list(state.get("completed_agents", []))
     completed.append("math")
-
-    logger.info("서브그래프 완료. 결과: %s", str(last_message.content)[:200])
 
     return {
         "messages": [AIMessage(content=f"[수학 계산 결과]\n{last_message.content}")],

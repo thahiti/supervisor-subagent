@@ -23,6 +23,7 @@ from langgraph.graph import END, START, StateGraph
 
 from src.agents import math_wrapper, translate_wrapper
 from src.logging import get_logger, setup_logging
+from src.logging.diff import format_state_pretty
 from src.state import State
 from src.supervisor import supervisor_node, supervisor_router
 
@@ -61,7 +62,16 @@ def run_scenario(app, name: str, description: str, user_message: str) -> None:
         "completed_agents": [],
     })
 
-    logger.info("시나리오 %s 최종 응답: %s", name, result["messages"][-1].content)
+    logger.info(
+        "\n%s\n"
+        "  [SCENARIO %s] Finished\n"
+        "%s\n"
+        "  Final State:\n%s\n"
+        "%s",
+        "=" * 60, name, "=" * 60,
+        format_state_pretty(result),
+        "=" * 60,
+    )
 
 
 def main():
