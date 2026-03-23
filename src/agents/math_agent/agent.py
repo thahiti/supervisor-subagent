@@ -66,7 +66,7 @@ def build_math_agent() -> CompiledStateGraph:
                 [(tc["name"], tc["args"]) for tc in tool_calls],
             )
         else:
-            logger.info("LLM 최종 응답: %s", str(response.content)[:200])
+            logger.info("LLM 최종 응답: %s", response.content)
 
         return {"messages": [response]}
 

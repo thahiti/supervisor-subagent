@@ -30,7 +30,7 @@ def translate_agent_node(state: WorkerState) -> dict:
         logger.error("LLM 호출 실패", exc_info=True)
         raise
 
-    logger.info("LLM 응답: %s", str(response.content)[:200])
+    logger.info("LLM 응답: %s", response.content)
     return {"messages": [response]}
 
 
