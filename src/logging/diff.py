@@ -51,10 +51,8 @@ def _format_message(msg: BaseMessage, indent: str = "        ") -> str:
     parts: list[str] = [f"type: {msg_type}"]
 
     if tool_calls:
-        calls_summary = ", ".join(
-            f"{tc['name']}({tc['args']})" for tc in tool_calls
-        )
-        parts.append(f"tool_calls: [{calls_summary}]")
+        calls_json = json.dumps(tool_calls, ensure_ascii=False, indent=2)
+        parts.append(f"tool_calls:\n{textwrap.indent(calls_json, indent)}")
 
     content = str(msg.content)
     if content:
