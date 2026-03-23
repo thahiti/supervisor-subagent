@@ -15,14 +15,18 @@
 """
 
 from dotenv import load_dotenv
-from langchain_core.messages import HumanMessage
 
 load_dotenv()
+
+from langchain_core.messages import HumanMessage
 from langgraph.graph import END, START, StateGraph
 
 from src.agents import math_wrapper, translate_wrapper
+from src.logging import get_logger, setup_logging
 from src.state import State
 from src.supervisor import supervisor_node, supervisor_router
+
+logger = get_logger("main")
 
 
 def build_graph():
@@ -47,9 +51,8 @@ def build_graph():
 
 def run_scenario(app, name: str, description: str, user_message: str) -> None:
     """데모 시나리오를 실행하고 결과를 출력한다."""
-    print(f"\n{'▶'*30}")
-    print(f"시나리오 {name}: {description}")
-    print(f"{'▶'*30}")
+    logger.info("시나리오 %s: %s", name, description)
+    logger.info("입력: %s", user_message)
 
     result = app.invoke({
         "messages": [HumanMessage(content=user_message)],
@@ -58,30 +61,25 @@ def run_scenario(app, name: str, description: str, user_message: str) -> None:
         "completed_agents": [],
     })
 
-    print(f"\n--- 시나리오 {name} 최종 응답 ---")
-    print(result["messages"][-1].content)
+    logger.info("시나리오 %s 최종 응답: %s", name, result["messages"][-1].content)
 
 
 def main():
+    setup_logging()
+    logger.info("Supervisor-Subagent 패턴 데모 시작")
+
     app = build_graph()
 
-    print("=" * 60)
-    print("Supervisor-Subagent 패턴 데모")
-    print("=" * 60)
-
-    # 시나리오 A: 수학 계산만
     run_scenario(
         app, "A", "수학 계산만",
         "3과 7을 더하고, 그 결과에 5를 곱해주세요",
     )
 
-    # 시나리오 B: 번역만
     run_scenario(
         app, "B", "번역만",
         "Hello, how are you?를 한국어로 번역해주세요",
     )
 
-    # 시나리오 C: 복합 요청 (수학 + 번역)
     run_scenario(
         app, "C", "복합 요청 (수학 + 번역)",
         "123 곱하기 456을 계산하고, 그 결과를 영어 문장으로 설명해주세요",
