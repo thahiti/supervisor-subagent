@@ -62,9 +62,22 @@ def _format_value(value: Any, max_len: int = 150) -> str:
     return repr(value)
 
 
-def _prefix_lines(text: str, prefix: str) -> str:
-    """여러 줄 텍스트의 각 줄에 prefix를 붙인다."""
-    return "\n".join(f"{prefix}{line}" for line in text.split("\n"))
+def _prefix_lines(text: str, marker: str) -> str:
+    """여러 줄 텍스트의 각 줄 선두에 marker를 삽입한다.
+
+    기존 들여쓰기를 유지하면서 marker를 선두 공백 자리에 끼워넣는다.
+    예: marker="+" 이면 "    foo" → "+   foo"
+    """
+    result: list[str] = []
+    for line in text.split("\n"):
+        stripped = line.lstrip(" ")
+        indent_len = len(line) - len(stripped)
+        if indent_len >= len(marker):
+            new_line = marker + " " * (indent_len - len(marker)) + stripped
+        else:
+            new_line = marker + stripped
+        result.append(new_line)
+    return "\n".join(result)
 
 
 def format_state_diff(before: dict, after: dict) -> str:
@@ -104,8 +117,8 @@ def format_state_diff(before: dict, after: dict) -> str:
                         lines.append(f"    [{i}] {_format_message(msg)}")
                 for j, msg in enumerate(added):
                     idx = len(old_msgs) + j
-                    msg_str = _format_message(msg, indent="          ")
-                    lines.append(_prefix_lines(f"    [{idx}] {msg_str}", "+   "))
+                    msg_str = _format_message(msg)
+                    lines.append(_prefix_lines(f"    [{idx}] {msg_str}", "+"))
             else:
                 lines.append(f"  {key}: {len(old_msgs)} messages")
                 for i, msg in enumerate(old_msgs):
