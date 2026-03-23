@@ -74,7 +74,7 @@ def supervisor_node(state: State) -> dict:
         logger.error("LLM 호출 실패", exc_info=True)
         raise
     content: str = response.content  # type: ignore[assignment]
-    logger.info("LLM 응답: %s", content[:200])
+    logger.info("LLM 응답: %s", content)
 
     try:
         parsed = extract_json_from_text(content)
@@ -96,7 +96,7 @@ def supervisor_node(state: State) -> dict:
     except (json.JSONDecodeError, ValueError) as e:
         logger.warning(
             "JSON 파싱 실패: %s → FINISH로 안전 종료. 원본: %s",
-            e, content[:300],
+            e, content,
         )
         return {
             "messages": [AIMessage(content=content)],
