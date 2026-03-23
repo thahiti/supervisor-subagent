@@ -4,7 +4,11 @@ from langchain_core.messages import AIMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 from langgraph.graph import END
 
+from src.logging import get_logger, log_node
 from src.state import State
+
+logger = get_logger("supervisor")
+router_logger = get_logger("router.supervisor")
 
 SUPERVISOR_SYSTEM_PROMPT = """당신은 멀티 에이전트 시스템의 슈퍼바이저입니다.
 
@@ -48,6 +52,7 @@ def extract_json_from_text(text: str) -> dict:
     return json.loads(text)
 
 
+@log_node("supervisor")
 def supervisor_node(state: State) -> dict:
     """슈퍼바이저: 요청 분석, 계획 수립, 다음 워커 결정."""
     llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
@@ -61,11 +66,15 @@ def supervisor_node(state: State) -> dict:
     )
 
     messages = [SystemMessage(content=system_prompt)] + state["messages"]
-    response = llm.invoke(messages)
-    content: str = response.content  # type: ignore[assignment]
 
-    print(f"\n{'='*50}")
-    print(f"[SUPERVISOR] 응답: {content}")
+    logger.info("LLM 호출 시작 (model=gpt-4o-mini)")
+    try:
+        response = llm.invoke(messages)
+    except Exception:
+        logger.error("LLM 호출 실패", exc_info=True)
+        raise
+    content: str = response.content  # type: ignore[assignment]
+    logger.info("LLM 응답: %s", content[:200])
 
     try:
         parsed = extract_json_from_text(content)
@@ -73,10 +82,10 @@ def supervisor_node(state: State) -> dict:
         reason = parsed.get("reason", "")
         new_plan = parsed.get("plan", plan)
 
-        print(f"[SUPERVISOR] 다음 에이전트: {next_agent}")
-        print(f"[SUPERVISOR] 이유: {reason}")
-        print(f"[SUPERVISOR] 계획: {new_plan}")
-        print(f"{'='*50}")
+        logger.info(
+            "LLM 결정: next=%s, reason=%s, plan=%s",
+            next_agent, reason, new_plan,
+        )
 
         return {
             "messages": [AIMessage(content=content)],
@@ -85,8 +94,10 @@ def supervisor_node(state: State) -> dict:
         }
 
     except (json.JSONDecodeError, ValueError) as e:
-        print(f"[SUPERVISOR] JSON 파싱 실패: {e} → FINISH로 안전 종료")
-        print(f"{'='*50}")
+        logger.warning(
+            "JSON 파싱 실패: %s → FINISH로 안전 종료. 원본: %s",
+            e, content[:300],
+        )
         return {
             "messages": [AIMessage(content=content)],
             "next_agent": "FINISH",
@@ -100,15 +111,17 @@ def supervisor_router(state: State) -> str:
 
     completed = state.get("completed_agents", [])
     if len(completed) >= MAX_ITERATIONS:
-        print(f"[ROUTER] 최대 반복 횟수({MAX_ITERATIONS}) 도달 → END")
+        router_logger.warning(
+            "최대 반복 횟수(%d) 도달 → END", MAX_ITERATIONS,
+        )
         return END
 
     if next_agent == "math":
-        print("[ROUTER] → math_agent")
+        router_logger.info("라우팅: → math_agent")
         return "math_agent"
     elif next_agent == "translate":
-        print("[ROUTER] → translate_agent")
+        router_logger.info("라우팅: → translate_agent")
         return "translate_agent"
     else:
-        print("[ROUTER] → END (FINISH)")
+        router_logger.info("라우팅: → END (FINISH)")
         return END
