@@ -64,15 +64,24 @@ def _format_message(msg: BaseMessage, indent: str = "        ") -> str:
     return ", ".join(parts)
 
 
-def _format_value(value: Any, max_len: int = 150) -> str:
-    """값을 로그용 문자열로 포맷한다."""
+def _type_name(value: Any) -> str:
+    """값의 타입명을 반환한다."""
+    if isinstance(value, list):
+        if value:
+            elem_type = type(value[0]).__name__
+            return f"list[{elem_type}]"
+        return "list"
+    return type(value).__name__
+
+
+def _format_value(value: Any) -> str:
+    """값을 (type) value 형태로 포맷한다."""
+    type_str = _type_name(value)
     if isinstance(value, list):
         if value and isinstance(value[0], BaseMessage):
-            return f"{len(value)} messages"
-        return repr(value)
-    if isinstance(value, str) and len(value) > max_len:
-        return f"'{value[:max_len]}...'"
-    return repr(value)
+            return f"({type_str}) {len(value)} messages"
+        return f"({type_str}) {repr(value)}"
+    return f"({type_str}) {repr(value)}"
 
 
 def _prefix_lines(text: str, marker: str) -> str:
@@ -124,7 +133,7 @@ def format_state_diff(before: dict, after: dict) -> str:
 
             if added:
                 total = len(old_msgs) + len(added)
-                lines.append(f"  {key}: {total} messages")
+                lines.append(f"  {key}: (list[BaseMessage]) {total} messages")
                 for i, msg in enumerate(old_msgs):
                     if isinstance(msg, BaseMessage):
                         lines.append(f"    [{i}] {_format_message(msg)}")
@@ -133,7 +142,7 @@ def format_state_diff(before: dict, after: dict) -> str:
                     msg_str = _format_message(msg)
                     lines.append(_prefix_lines(f"    [{idx}] {msg_str}", "+"))
             else:
-                lines.append(f"  {key}: {len(old_msgs)} messages")
+                lines.append(f"  {key}: (list[BaseMessage]) {len(old_msgs)} messages")
                 for i, msg in enumerate(old_msgs):
                     if isinstance(msg, BaseMessage):
                         lines.append(f"    [{i}] {_format_message(msg)}")
@@ -141,11 +150,12 @@ def format_state_diff(before: dict, after: dict) -> str:
 
         # list 필드
         if isinstance(old_value, list) and isinstance(new_value, list):
+            type_str = _type_name(new_value)
             if old_value != new_value:
                 added = [x for x in new_value if x not in old_value]
                 removed = [x for x in old_value if x not in new_value]
                 if removed or added:
-                    lines.append(f"  {key}:")
+                    lines.append(f"  {key}: ({type_str})")
                     for item in removed:
                         lines.append(f"-     {repr(item)}")
                     for item in old_value:
@@ -154,9 +164,9 @@ def format_state_diff(before: dict, after: dict) -> str:
                     for item in added:
                         lines.append(f"+     {repr(item)}")
                 else:
-                    lines.append(f"  {key}: {repr(new_value)}")
+                    lines.append(f"  {key}: ({type_str}) {repr(new_value)}")
             else:
-                lines.append(f"  {key}: {repr(old_value)}")
+                lines.append(f"  {key}: ({type_str}) {repr(old_value)}")
             continue
 
         # 일반 필드
@@ -182,7 +192,7 @@ def format_state_pretty(state: dict) -> str:
     lines: list[str] = []
     for key, value in state.items():
         if key == "messages" and isinstance(value, list):
-            lines.append(f"  {key}: {len(value)} messages")
+            lines.append(f"  {key}: (list[BaseMessage]) {len(value)} messages")
             for i, msg in enumerate(value):
                 if isinstance(msg, BaseMessage):
                     lines.append(f"    [{i}] {_format_message(msg)}")
