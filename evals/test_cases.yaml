@@ -1,0 +1,67 @@
+test_cases:
+  # --- Math only ---
+  - id: "math_simple_add"
+    description: "Simple addition"
+    input: "3과 7을 더해주세요"
+    expected_routing: ["math"]
+    checks:
+      math:
+        expected_number: 10.0
+      overall:
+        contains: ["10"]
+
+  - id: "math_chained"
+    description: "Chained math: add then multiply"
+    input: "3과 7을 더하고, 그 결과에 5를 곱해주세요"
+    expected_routing: ["math"]
+    checks:
+      math:
+        expected_number: 50.0
+      overall:
+        contains: ["50"]
+
+  - id: "math_divide"
+    description: "Division"
+    input: "100을 4로 나눠주세요"
+    expected_routing: ["math"]
+    checks:
+      math:
+        expected_number: 25.0
+      overall:
+        contains: ["25"]
+
+  # --- Translate only ---
+  - id: "translate_en_to_kr"
+    description: "English to Korean translation"
+    input: "Hello, how are you?를 한국어로 번역해주세요"
+    expected_routing: ["translate"]
+    checks:
+      translation:
+        source_text: "Hello, how are you?"
+        direction: "en_to_kr"
+        must_contain_meaning: ["안녕"]
+      overall:
+        not_contains: ["Hello"]
+
+  - id: "translate_kr_to_en"
+    description: "Korean to English translation"
+    input: "'오늘 날씨가 좋습니다'를 영어로 번역해주세요"
+    expected_routing: ["translate"]
+    checks:
+      translation:
+        source_text: "오늘 날씨가 좋습니다"
+        direction: "kr_to_en"
+        must_contain_meaning: ["weather"]
+      overall:
+        contains_any: ["weather", "nice", "good"]
+
+  # --- Multi-step ---
+  - id: "multi_math_then_translate"
+    description: "Compute then describe in English"
+    input: "123 곱하기 456을 계산하고, 그 결과를 영어 문장으로 설명해주세요"
+    expected_routing: ["math", "translate"]
+    checks:
+      math:
+        expected_number: 56088.0
+      overall:
+        contains: ["56088"]
