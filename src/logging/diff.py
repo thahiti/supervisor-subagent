@@ -19,6 +19,9 @@ def _try_parse_json(text: str) -> str | None:
 
     try:
         parsed = json.loads(clean)
+        # dict/list만 JSON으로 포맷 (숫자, 문자열 등 스칼라는 무시)
+        if not isinstance(parsed, (dict, list)):
+            return None
         return json.dumps(parsed, ensure_ascii=False, indent=2)
     except (json.JSONDecodeError, ValueError):
         return None
@@ -42,11 +45,17 @@ def _format_message(msg: BaseMessage, indent: str = "        ") -> str:
     tool_calls = getattr(msg, "tool_calls", None)
 
     parts: list[str] = [f"type: {msg_type}"]
-    if tool_calls:
-        parts.append(f"tool_calls: {len(tool_calls)}")
 
-    formatted_content = _format_content(str(msg.content), indent)
-    parts.append(f"content: {formatted_content}")
+    if tool_calls:
+        calls_summary = ", ".join(
+            f"{tc['name']}({tc['args']})" for tc in tool_calls
+        )
+        parts.append(f"tool_calls: [{calls_summary}]")
+
+    content = str(msg.content)
+    if content:
+        formatted_content = _format_content(content, indent)
+        parts.append(f"content: {formatted_content}")
 
     return ", ".join(parts)
 
