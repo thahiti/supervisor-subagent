@@ -21,7 +21,7 @@ load_dotenv()
 from langchain_core.messages import HumanMessage
 from langgraph.graph import END, START, StateGraph
 
-from src.agents import math_wrapper, translate_wrapper
+from src.agents import registry
 from src.logging import get_logger, setup_logging
 from src.logging.diff import format_state_pretty
 from src.state import State
@@ -35,17 +35,19 @@ def build_graph():
     graph = StateGraph(State)
 
     graph.add_node("supervisor", supervisor_node)
-    graph.add_node("math_agent", math_wrapper)
-    graph.add_node("translate_agent", translate_wrapper)
+
+    node_names: list[str] = []
+    for entry in registry.entries:
+        graph.add_node(entry.node_name, entry.wrapper)
+        graph.add_edge(entry.node_name, "supervisor")
+        node_names.append(entry.node_name)
 
     graph.add_edge(START, "supervisor")
     graph.add_conditional_edges(
         "supervisor",
         supervisor_router,
-        ["math_agent", "translate_agent", END],
+        [*node_names, END],
     )
-    graph.add_edge("math_agent", "supervisor")
-    graph.add_edge("translate_agent", "supervisor")
 
     return graph.compile()
 
