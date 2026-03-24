@@ -129,7 +129,7 @@ math_subgraph = build_math_agent()
 
 
 def math_wrapper(state: State) -> dict:
-    """수학 에이전트 서브그래프를 실행하고 completed_agents를 업데이트한다."""
+    """수학 계산을 수행합니다. 덧셈, 곱셈, 나눗셈 등의 계산이 필요할 때 사용합니다."""
     try:
         result = math_subgraph.invoke({"messages": state["messages"]})
     except Exception:

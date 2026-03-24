@@ -35,7 +35,7 @@ def translate_agent_node(state: WorkerState) -> dict:
 
 
 def translate_wrapper(state: State) -> dict:
-    """번역 에이전트를 실행하고 completed_agents를 업데이트한다."""
+    """텍스트를 번역합니다. 한국어↔영어 번역이 필요할 때 사용합니다."""
     result = translate_agent_node({"messages": state["messages"]})
 
     last_message = result["messages"][-1]
