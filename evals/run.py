@@ -19,7 +19,7 @@ from src.logging import setup_logging
 # registry에 에이전트를 등록하기 위해 import
 import src.agents  # noqa: F401
 
-from evals.runner import load_yaml, print_results, run_all_tests
+from evals.runner import load_from_dir, print_results, run_all_tests
 
 
 def main() -> None:
@@ -41,8 +41,8 @@ def main() -> None:
 
     setup_logging()
 
-    yaml_path = Path(__file__).parent / "test_cases.yaml"
-    config, test_cases = load_yaml(yaml_path)
+    res_dir = Path(__file__).parent / "res"
+    config, test_cases = load_from_dir(res_dir)
 
     if args.filter:
         test_cases = [tc for tc in test_cases if args.filter in tc["id"]]

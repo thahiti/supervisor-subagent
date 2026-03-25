@@ -12,18 +12,57 @@ from evals.types import EvalConfig, TestCase, TestCaseResult
 logger = logging.getLogger("supervisor_subagent.eval.runner")
 
 
-def load_yaml(path: str | Path) -> tuple[EvalConfig, list[TestCase]]:
-    """YAML 파일에서 eval_config와 test_cases를 로드한다.
+def _load_single_yaml(path: Path) -> tuple[EvalConfig | None, list[TestCase]]:
+    """단일 YAML 파일을 로드한다.
 
     Args:
         path: YAML 파일 경로
 
     Returns:
-        (eval_config, test_cases) 튜플
+        (eval_config 또는 None, test_cases) 튜플
     """
     with open(path) as f:
         data = yaml.safe_load(f)
-    return data["eval_config"], data["test_cases"]
+    if data is None:
+        return None, []
+    config = data.get("eval_config")
+    cases = data.get("test_cases", [])
+    return config, cases
+
+
+def load_from_dir(res_dir: str | Path) -> tuple[EvalConfig, list[TestCase]]:
+    """res 디렉토리 하위의 모든 YAML 파일을 수집하여 로드한다.
+
+    eval_config는 첫 번째로 발견된 것을 사용한다.
+    test_cases는 모든 파일에서 병합한다.
+
+    Args:
+        res_dir: YAML 파일이 위치한 디렉토리
+
+    Returns:
+        (eval_config, 병합된 test_cases) 튜플
+    """
+    res_path = Path(res_dir)
+    yaml_files = sorted(res_path.glob("**/*.yaml")) + sorted(res_path.glob("**/*.yml"))
+
+    if not yaml_files:
+        raise FileNotFoundError(f"No YAML files found in {res_path}")
+
+    config: EvalConfig | None = None
+    all_cases: list[TestCase] = []
+
+    for f in yaml_files:
+        logger.info("YAML 로드: %s", f)
+        file_config, cases = _load_single_yaml(f)
+        if file_config is not None and config is None:
+            config = file_config
+        all_cases.extend(cases)
+
+    if config is None:
+        raise ValueError("eval_config가 정의된 YAML 파일이 없습니다.")
+
+    logger.info("총 %d개 테스트 케이스 로드 (%d개 파일)", len(all_cases), len(yaml_files))
+    return config, all_cases
 
 
 def _resolve_criteria(
