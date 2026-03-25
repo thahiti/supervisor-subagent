@@ -41,7 +41,7 @@ def main() -> None:
 
     setup_logging()
 
-    res_dir = Path(__file__).parent / "res"
+    res_dir = Path(__file__).parent.parent / "res"
     config, test_cases = load_from_dir(res_dir)
 
     if args.filter:
