@@ -1,0 +1,57 @@
+eval_config:
+  judge_model: "gpt-4o"
+  judge_temperature: 0.0
+  pass_threshold: 7.0
+  agent_criteria:
+    math:
+      - correctness
+      - step_reasoning
+    translate:
+      - correctness
+      - fluency
+      - naturalness
+
+test_cases:
+  # --- Math ---
+  - id: "math_simple_add"
+    description: "단순 덧셈"
+    target_agent: "math"
+    input: "3과 7을 더해주세요"
+    reference_answer: "3 + 7 = 10. 결과는 10입니다."
+
+  - id: "math_chained"
+    description: "연쇄 계산: 덧셈 후 곱셈"
+    target_agent: "math"
+    input: "3과 7을 더하고, 그 결과에 5를 곱해주세요"
+    reference_answer: "3 + 7 = 10, 10 × 5 = 50. 최종 결과는 50입니다."
+
+  - id: "math_divide"
+    description: "나눗셈"
+    target_agent: "math"
+    input: "100을 4로 나눠주세요"
+    reference_answer: "100 ÷ 4 = 25. 결과는 25입니다."
+
+  # --- Translate ---
+  - id: "translate_en_to_kr"
+    description: "영어 → 한국어 번역"
+    target_agent: "translate"
+    input: "Hello, how are you?를 한국어로 번역해주세요"
+    reference_answer: "안녕하세요, 어떻게 지내세요?"
+
+  - id: "translate_kr_to_en"
+    description: "한국어 → 영어 번역"
+    target_agent: "translate"
+    input: "'오늘 날씨가 좋습니다'를 영어로 번역해주세요"
+    reference_answer: "The weather is nice today."
+
+  # --- 케이스 레벨 criteria override 예시 ---
+  - id: "translate_formal"
+    description: "격식체 번역 (naturalness 강조)"
+    target_agent: "translate"
+    input: "'귀사의 발전을 기원합니다'를 영어로 번역해주세요"
+    reference_answer: "We wish your company continued success."
+    eval_criteria:
+      - correctness
+      - fluency
+      - naturalness
+      - formality
