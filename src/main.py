@@ -25,7 +25,7 @@ from src.agents import registry
 from src.logging import get_logger, setup_logging
 from src.logging.diff import format_state_pretty
 from src.state import State
-from src.supervisor import supervisor_node, supervisor_router
+from src.agents.supervisor import supervisor_node, supervisor_router
 
 logger = get_logger("main")
 
