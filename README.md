@@ -57,7 +57,8 @@ supervisor-subagent/
 
 | 문서 | 내용 |
 |------|------|
-| [Agents.md](./Agents.md) | 에이전트 아키텍처, 레지스트리, 새 에이전트 추가 방법 |
+| [Agents.md](./Agents.md) | 에이전트 아키텍처, Supervisor, Subagent, 새 에이전트 추가 방법 |
+| [AgentRegistry.md](./AgentRegistry.md) | 레지스트리 API 상세, 통합 지점, 등록 메커니즘, 설계 근거 |
 | [Logging.md](./Logging.md) | 로깅 시스템 설계, `@log_node` 데코레이터, git diff 스타일 상태 출력 |
 | [Evaluation.md](./Evaluation.md) | LLM-as-Judge 평가 시스템, 테스트 케이스 작성법, CLI 사용법 |
 
