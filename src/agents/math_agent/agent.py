@@ -4,6 +4,7 @@ from langchain_openai import ChatOpenAI
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
+from src.agents.registry import registry
 from src.logging import get_logger, log_node
 from src.state import State, WorkerState
 
@@ -128,6 +129,7 @@ def build_math_agent() -> CompiledStateGraph:
 math_subgraph = build_math_agent()
 
 
+@registry.agent("math")
 def math_wrapper(state: State) -> dict:
     """수학 계산을 수행합니다. 덧셈, 곱셈, 나눗셈 등의 계산이 필요할 때 사용합니다."""
     try:

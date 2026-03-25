@@ -85,6 +85,31 @@ class AgentRegistry:
             lines.append(f"- **{entry.name}**: {entry.description}")
         return "\n".join(lines)
 
+    def agent(
+        self,
+        name: str,
+        *,
+        node_name: str | None = None,
+        description: str | None = None,
+    ) -> Callable:
+        """에이전트 등록 데코레이터.
+
+        Args:
+            name: 라우팅 키 (supervisor가 선택할 이름)
+            node_name: 그래프 노드 이름. 미지정 시 "{name}_agent"
+            description: 에이전트 설명. 미지정 시 wrapper의 docstring 사용
+
+        Example:
+            @registry.agent("math")
+            def math_wrapper(state: State) -> dict:
+                \"\"\"수학 계산을 수행합니다.\"\"\"
+                ...
+        """
+        def decorator(func: Callable[[State], dict]) -> Callable[[State], dict]:
+            self.register(name, func, node_name=node_name, description=description)
+            return func
+        return decorator
+
 
 # 글로벌 레지스트리 인스턴스
 registry = AgentRegistry()

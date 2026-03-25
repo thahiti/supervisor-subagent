@@ -1,6 +1,7 @@
 from langchain_core.messages import AIMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 
+from src.agents.registry import registry
 from src.logging import get_logger, log_node
 from src.state import State, WorkerState
 
@@ -34,6 +35,7 @@ def translate_agent_node(state: WorkerState) -> dict:
     return {"messages": [response]}
 
 
+@registry.agent("translate")
 def translate_wrapper(state: State) -> dict:
     """텍스트를 번역합니다. 한국어↔영어 번역이 필요할 때 사용합니다."""
     result = translate_agent_node({"messages": state["messages"]})
