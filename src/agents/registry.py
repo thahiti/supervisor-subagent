@@ -94,6 +94,9 @@ class AgentRegistry:
     ) -> Callable:
         """에이전트 등록 데코레이터.
 
+        반드시 가장 바깥쪽(outermost) 데코레이터로 사용해야 한다.
+        다른 데코레이터(log_node 등)가 반환한 최종 wrapper를 registry에 등록한다.
+
         Args:
             name: 라우팅 키 (supervisor가 선택할 이름)
             node_name: 그래프 노드 이름. 미지정 시 "{name}_agent"
@@ -101,6 +104,7 @@ class AgentRegistry:
 
         Example:
             @registry.agent("math")
+            @log_node("math_wrapper")
             def math_wrapper(state: State) -> dict:
                 \"\"\"수학 계산을 수행합니다.\"\"\"
                 ...
