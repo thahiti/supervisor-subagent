@@ -2,3 +2,4 @@
 __pycache__/
 *.pyc
 .venv/
+res/sample_db/*.db
