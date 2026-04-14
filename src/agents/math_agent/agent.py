@@ -1,10 +1,10 @@
 from langchain_core.messages import AIMessage, ToolMessage, SystemMessage
 from langchain_core.tools import tool
-from langchain_openai import ChatOpenAI
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
 from src.agents.registry import registry
+from src.llm import get_chat_model
 from src.logging import get_logger, log_node
 from src.state import State, WorkerState
 
@@ -42,7 +42,7 @@ def build_math_agent() -> CompiledStateGraph:
 
     @log_node("math_agent_internal")
     def math_agent_node(state: WorkerState) -> dict:
-        llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+        llm = get_chat_model()
         llm_with_tools = llm.bind_tools(MATH_TOOLS)
 
         system_msg = SystemMessage(content=(

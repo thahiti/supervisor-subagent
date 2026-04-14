@@ -6,13 +6,13 @@ Backend를 감싼 tools를 LLM에 바인딩해 자연어 → SQL → 실행 → 
 """
 
 from langchain_core.messages import AIMessage, SystemMessage, ToolMessage
-from langchain_openai import ChatOpenAI
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
 from src.agents.registry import registry
 from src.agents.sql_agent.frontend.prompt import build_system_prompt
 from src.agents.sql_agent.tools import SQL_TOOLS, SQL_TOOLS_BY_NAME
+from src.llm import get_chat_model
 from src.logging import get_logger, log_node
 from src.state import State, WorkerState
 
@@ -27,7 +27,7 @@ def build_sql_agent() -> CompiledStateGraph:
 
     @log_node("sql_agent_internal")
     def sql_agent_node(state: WorkerState) -> dict:
-        llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+        llm = get_chat_model()
         llm_with_tools = llm.bind_tools(SQL_TOOLS)
 
         messages = [SystemMessage(content=system_prompt)] + state["messages"]

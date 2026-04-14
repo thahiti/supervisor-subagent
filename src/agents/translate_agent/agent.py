@@ -1,7 +1,7 @@
 from langchain_core.messages import AIMessage, SystemMessage
-from langchain_openai import ChatOpenAI
 
 from src.agents.registry import registry
+from src.llm import get_chat_model
 from src.logging import get_logger, log_node
 from src.state import State, WorkerState
 
@@ -20,7 +20,7 @@ TRANSLATE_SYSTEM_PROMPT = """당신은 전문 번역가입니다.
 @log_node("translate_agent_internal")
 def translate_agent_node(state: WorkerState) -> dict:
     """번역 에이전트: LLM 직접 호출로 번역을 수행한다."""
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+    llm = get_chat_model()
 
     messages = [SystemMessage(content=TRANSLATE_SYSTEM_PROMPT)] + state["messages"]
 

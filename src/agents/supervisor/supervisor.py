@@ -1,10 +1,10 @@
 import json
 
 from langchain_core.messages import AIMessage, SystemMessage
-from langchain_openai import ChatOpenAI
 from langgraph.graph import END
 
 from src.agents.registry import registry
+from src.llm import get_chat_model
 from src.logging import get_logger, log_node
 from src.state import State
 
@@ -68,7 +68,7 @@ def _build_system_prompt(plan: str, completed_agents: list[str]) -> str:
 @log_node("supervisor")
 def supervisor_node(state: State) -> dict:
     """슈퍼바이저: 요청 분석, 계획 수립, 다음 워커 결정."""
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+    llm = get_chat_model()
 
     plan = state.get("plan", "아직 계획 없음")
     completed = state.get("completed_agents", [])
