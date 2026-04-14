@@ -10,6 +10,10 @@ eval_config:
       - correctness
       - fluency
       - naturalness
+    sql:
+      - correctness
+      - query_validity
+      - schema_adherence
 
 test_cases:
   # --- Math ---
@@ -55,3 +59,34 @@ test_cases:
       - fluency
       - naturalness
       - formality
+
+  # --- SQL ---
+  - id: "sql_count_employees"
+    description: "전체 직원 수 집계"
+    target_agent: "sql"
+    input: "전체 직원은 몇 명인가요?"
+    reference_answer: "전체 직원은 500명입니다."
+
+  - id: "sql_count_departments"
+    description: "부서 수 집계"
+    target_agent: "sql"
+    input: "등록된 부서는 몇 개인가요?"
+    reference_answer: "등록된 부서는 10개입니다."
+
+  - id: "sql_filter_salary"
+    description: "조건 필터 집계 (salary >= 50M)"
+    target_agent: "sql"
+    input: "연봉이 5천만원 이상인 직원은 몇 명인가요?"
+    reference_answer: "연봉이 5천만원 이상인 직원은 223명입니다."
+
+  - id: "sql_null_manager"
+    description: "NULL 처리 (manager_id IS NULL)"
+    target_agent: "sql"
+    input: "담당 매니저가 배정되지 않은 직원은 몇 명인가요?"
+    reference_answer: "담당 매니저가 배정되지 않은 직원은 32명입니다."
+
+  - id: "sql_date_range"
+    description: "날짜 범위 집계"
+    target_agent: "sql"
+    input: "2025년 3월에 들어온 주문은 몇 건인가요?"
+    reference_answer: "2025년 3월에 들어온 주문은 557건입니다."
