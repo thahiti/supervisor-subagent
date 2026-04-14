@@ -2,10 +2,10 @@ import json
 import logging
 
 from langchain_core.messages import SystemMessage, HumanMessage
-from langchain_openai import ChatOpenAI
 
 from evals.prompts import JUDGE_SYSTEM_PROMPT, build_judge_user_prompt
 from evals.types import EvalConfig, JudgeResult, ScoreDetail
+from src.llm import get_chat_model
 
 logger = logging.getLogger("supervisor_subagent.eval.judge")
 
@@ -87,7 +87,7 @@ def judge(
     Returns:
         Judge 평가 결과
     """
-    llm = ChatOpenAI(
+    llm = get_chat_model(
         model=config["judge_model"],
         temperature=config["judge_temperature"],
     )
