@@ -90,3 +90,34 @@ test_cases:
     target_agent: "sql"
     input: "2025년 3월에 들어온 주문은 몇 건인가요?"
     reference_answer: "2025년 3월에 들어온 주문은 557건입니다."
+
+  # --- 복잡한 SQL (JOIN / GROUP BY / 서브쿼리) ---
+  - id: "sql_join_top_dept_by_avg_salary"
+    description: "부서별 평균 연봉 최고 부서 (employees ⨝ departments)"
+    target_agent: "sql"
+    input: "직원 평균 연봉이 가장 높은 부서는 어디인가요?"
+    reference_answer: "평균 연봉이 가장 높은 부서는 마케팅입니다 (평균 약 55,015,661원)."
+
+  - id: "sql_join_top_category_revenue"
+    description: "카테고리별 매출 1위 (orders ⨝ order_items ⨝ products, 취소 제외)"
+    target_agent: "sql"
+    input: "취소되지 않은 주문 기준으로 매출이 가장 높은 제품 카테고리는 무엇인가요?"
+    reference_answer: "매출 1위 카테고리는 식품으로, 총 매출은 약 705,999,030원입니다."
+
+  - id: "sql_correlated_subquery_above_dept_avg"
+    description: "자기 부서 평균 연봉보다 높은 직원 수 (상관 서브쿼리)"
+    target_agent: "sql"
+    input: "자신이 속한 부서의 평균 연봉보다 더 많이 받는 직원은 몇 명인가요?"
+    reference_answer: "자신의 부서 평균 연봉보다 높은 연봉을 받는 직원은 210명입니다."
+
+  - id: "sql_cancel_rate"
+    description: "주문 취소율 (CASE WHEN 집계)"
+    target_agent: "sql"
+    input: "전체 주문 중 취소된 주문의 비율은 몇 퍼센트인가요?"
+    reference_answer: "전체 주문 중 취소율은 약 4.5%입니다."
+
+  - id: "sql_join_top_product_quantity"
+    description: "가장 많이 팔린 제품 (3-way JOIN + GROUP BY)"
+    target_agent: "sql"
+    input: "취소되지 않은 주문에서 수량 기준으로 가장 많이 팔린 제품은 무엇인가요?"
+    reference_answer: "가장 많이 팔린 제품은 '덤벨 719'로, 총 667개가 판매되었습니다."
