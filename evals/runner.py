@@ -21,7 +21,7 @@ def _load_single_yaml(path: Path) -> tuple[EvalConfig | None, list[TestCase]]:
     Returns:
         (eval_config 또는 None, test_cases) 튜플
     """
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         data = yaml.safe_load(f)
     if data is None:
         return None, []
