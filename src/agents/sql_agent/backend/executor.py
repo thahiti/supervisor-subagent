@@ -145,6 +145,9 @@ class SqlExecutor:
         except sqlite3.Error as exc:
             logger.warning("SQL 실행 오류: %s | query=%s", exc, query[:120])
             return _error_result(f"SQLite 오류: {exc}")
+        except FileNotFoundError as exc:
+            logger.warning("DB 파일 없음: %s", exc)
+            return _error_result(str(exc))
 
         markdown = to_markdown_table(columns, rows)
         logger.info(
