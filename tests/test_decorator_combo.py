@@ -83,5 +83,8 @@ def test_agent_outer_log_node_inner_logging(
     with caplog.at_level(logging.INFO):
         entry.wrapper(state)
 
+    for record in caplog.records:
+        print(f"[{record.levelname}] {record.name}: {record.message}")
+
     assert any("ECHO_WRAPPER" in record.message for record in caplog.records), \
         "registry 경유 호출 시 log_node 로깅이 발생하지 않음"
