@@ -95,3 +95,38 @@ class TestResponseGeneratorNode:
         result = response_generator_node(state)
         assert len(result["messages"]) == 1
         assert isinstance(result["messages"][0], AIMessage)
+
+from src.agents.supervisor.supervisor import supervisor_router
+
+
+class TestSupervisorRouterChange:
+    def test_finish_routes_to_response_generator(self) -> None:
+        state = {
+            "messages": [],
+            "next_agent": "FINISH",
+            "plan": "",
+            "completed_agents": [],
+        }
+        result = supervisor_router(state)
+        assert result == "response_generator"
+
+    def test_max_iterations_routes_to_response_generator(self) -> None:
+        state = {
+            "messages": [],
+            "next_agent": "math",
+            "plan": "",
+            "completed_agents": ["a", "b", "c", "d", "e"],
+        }
+        result = supervisor_router(state)
+        assert result == "response_generator"
+
+    def test_agent_routes_normally(self) -> None:
+        import src.agents  # noqa: F401
+        state = {
+            "messages": [],
+            "next_agent": "math",
+            "plan": "",
+            "completed_agents": [],
+        }
+        result = supervisor_router(state)
+        assert result == "math_agent"

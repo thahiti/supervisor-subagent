@@ -1,7 +1,6 @@
 import json
 
 from langchain_core.messages import AIMessage, SystemMessage
-from langgraph.graph import END
 
 from src.agents.registry import registry
 from src.llm import get_chat_model
@@ -115,6 +114,9 @@ def supervisor_node(state: State) -> dict:
         }
 
 
+RESPONSE_GENERATOR_NODE = "response_generator"
+
+
 def supervisor_router(state: State) -> str:
     """슈퍼바이저의 결정에 따라 다음 노드를 라우팅한다."""
     next_agent = state.get("next_agent", "FINISH")
@@ -122,14 +124,14 @@ def supervisor_router(state: State) -> str:
     completed = state.get("completed_agents", [])
     if len(completed) >= MAX_ITERATIONS:
         router_logger.warning(
-            "최대 반복 횟수(%d) 도달 → END", MAX_ITERATIONS,
+            "최대 반복 횟수(%d) 도달 → response_generator", MAX_ITERATIONS,
         )
-        return END
+        return RESPONSE_GENERATOR_NODE
 
     entry = registry.get(next_agent)
     if entry is not None:
         router_logger.info("라우팅: → %s", entry.node_name)
         return entry.node_name
 
-    router_logger.info("라우팅: → END (FINISH)")
-    return END
+    router_logger.info("라우팅: → response_generator (FINISH)")
+    return RESPONSE_GENERATOR_NODE
