@@ -74,7 +74,7 @@ START → query_rewriter → supervisor → router → [subagent] → supervisor
 | 사용자 원본 쿼리 | |
 | 서브에이전트 결과(들) | |
 
-- `state["messages"]`에는 supervisor의 JSON 응답도 포함되어 있으므로, 페르소나 프롬프트에서 이를 무시하도록 지시
+- `state["messages"]`에는 supervisor의 JSON 응답도 포함되어 있다. 메시지 필터링(JSON 형태의 AIMessage 제거) 대신, 페르소나 프롬프트에서 "JSON 형식의 내부 판단 메시지는 무시하고 사용자 질문과 워커 결과만 참고하라"고 지시하는 방식을 사용한다. 이유: 필터링 로직은 메시지 포맷 변경 시 깨지기 쉽고, LLM이 무관한 메시지를 무시하는 것은 신뢰할 수 있는 동작이다
 - 사용자 원본 쿼리를 포함하는 이유: 질문 톤에 맞춘 답변 생성 ("알려줘" → 친근, "보고해주세요" → 격식)
 
 ### 페르소나 프롬프트 설계
