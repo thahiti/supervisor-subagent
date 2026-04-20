@@ -9,9 +9,9 @@
     uv run python -m src.main
 
 실행 흐름:
-    [START] → [supervisor] → (라우터) → [math_agent]      → [supervisor] → ...
-                                       → [translate_agent] → [supervisor]
-                                       → END (FINISH)
+    [START] → [query_rewriter] → [supervisor] → (라우터) → [math_agent]      → [supervisor] → ...
+                                                         → [translate_agent] → [supervisor]
+                                                         → END (FINISH)
 """
 
 from dotenv import load_dotenv
@@ -22,10 +22,11 @@ from langchain_core.messages import HumanMessage
 from langgraph.graph import END, START, StateGraph
 
 from src.agents import registry
+from src.agents.query_rewriter import query_rewriter_node
+from src.agents.supervisor import supervisor_node, supervisor_router
 from src.logging import get_logger, setup_logging
 from src.logging.diff import format_state_pretty
 from src.state import State
-from src.agents.supervisor import supervisor_node, supervisor_router
 
 logger = get_logger("main")
 
@@ -34,6 +35,7 @@ def build_graph():
     """Supervisor-Subagent 메인 그래프를 빌드한다."""
     graph = StateGraph(State)
 
+    graph.add_node("query_rewriter", query_rewriter_node)
     graph.add_node("supervisor", supervisor_node)
 
     node_names: list[str] = []
@@ -42,7 +44,8 @@ def build_graph():
         graph.add_edge(entry.node_name, "supervisor")
         node_names.append(entry.node_name)
 
-    graph.add_edge(START, "supervisor")
+    graph.add_edge(START, "query_rewriter")
+    graph.add_edge("query_rewriter", "supervisor")
     graph.add_conditional_edges(
         "supervisor",
         supervisor_router,
