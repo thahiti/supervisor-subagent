@@ -6,7 +6,7 @@ from src.agents.query_rewriter.dictionary_client import (
     DictionaryClient,
     MockDictionaryClient,
 )
-from src.agents.query_rewriter.tokenizer import extract_tokens
+from src.agents.query_rewriter.tokenizer import extract_tokens, tokenize
 
 
 class TestExtractTokens:
@@ -66,3 +66,43 @@ class TestMockDictionaryClient:
     def test_implements_interface(self) -> None:
         client = MockDictionaryClient({})
         assert isinstance(client, DictionaryClient)
+
+
+class TestTokenize:
+    def test_replaces_known_tokens(self) -> None:
+        client = MockDictionaryClient({"KPI_01": "월간 매출 성장률"})
+        result = tokenize("KPI_01의 추이를 보여줘", client)
+        assert result == "KPI_01(월간 매출 성장률)의 추이를 보여줘"
+
+    def test_replaces_multiple_tokens(self) -> None:
+        client = MockDictionaryClient({
+            "ACC_RCV": "미수금 잔액",
+            "NET_PRF": "순이익",
+        })
+        result = tokenize("ACC_RCV와 NET_PRF를 비교해줘", client)
+        assert result == "ACC_RCV(미수금 잔액)와 NET_PRF(순이익)를 비교해줘"
+
+    def test_skips_unknown_tokens(self) -> None:
+        client = MockDictionaryClient({"KPI_01": "월간 매출 성장률"})
+        result = tokenize("KPI_01과 UNKNOWN_99를 보여줘", client)
+        assert result == "KPI_01(월간 매출 성장률)과 UNKNOWN_99를 보여줘"
+
+    def test_skips_empty_value_tokens(self) -> None:
+        client = MockDictionaryClient({"KPI_01": ""})
+        result = tokenize("KPI_01의 추이", client)
+        assert result == "KPI_01의 추이"
+
+    def test_no_tokens_returns_original(self) -> None:
+        client = MockDictionaryClient({"KPI_01": "매출"})
+        result = tokenize("오늘 매출을 알려주세요", client)
+        assert result == "오늘 매출을 알려주세요"
+
+    def test_empty_string(self) -> None:
+        client = MockDictionaryClient({})
+        result = tokenize("", client)
+        assert result == ""
+
+    def test_duplicate_token_replaced_consistently(self) -> None:
+        client = MockDictionaryClient({"KPI_01": "매출"})
+        result = tokenize("KPI_01을 보고 KPI_01을 다시 확인", client)
+        assert result == "KPI_01(매출)을 보고 KPI_01(매출)을 다시 확인"
