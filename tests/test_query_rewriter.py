@@ -13,7 +13,6 @@ import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
 from src.agents.query_rewriter.prompt import (
-    TERM_DICTIONARY,
     _format_dictionary,
     build_rewriter_system_prompt,
 )
@@ -33,9 +32,15 @@ class TestPrompt:
 
     def test_build_prompt_includes_dictionary_terms(self) -> None:
         now = datetime(2026, 4, 20, 14, 30)
+        dictionary = {"TEST_KEY": "테스트 정의"}
+        prompt = build_rewriter_system_prompt(now, dictionary=dictionary)
+        assert "TEST_KEY" in prompt
+        assert "테스트 정의" in prompt
+
+    def test_build_prompt_without_dictionary(self) -> None:
+        now = datetime(2026, 4, 20, 14, 30)
         prompt = build_rewriter_system_prompt(now)
-        for term in TERM_DICTIONARY:
-            assert term in prompt
+        assert "없음" in prompt
 
     def test_format_dictionary_empty(self) -> None:
         assert _format_dictionary({}) == "없음"

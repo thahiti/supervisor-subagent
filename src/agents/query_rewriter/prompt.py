@@ -1,12 +1,6 @@
-"""쿼리 리라이터 프롬프트 및 용어 사전 정의."""
+"""쿼리 리라이터 프롬프트 정의."""
 
 from datetime import datetime
-
-TERM_DICTIONARY: dict[str, str] = {
-    "매출": "sales(주문 금액 합계)",
-    "순이익": "net_profit(매출 - 비용)",
-    "활성 사용자": "active_users(최근 30일 내 로그인한 사용자)",
-}
 
 
 def _format_dictionary(dictionary: dict[str, str]) -> str:
@@ -16,18 +10,22 @@ def _format_dictionary(dictionary: dict[str, str]) -> str:
     return "\n".join(f"- {term} → {definition}" for term, definition in dictionary.items())
 
 
-def build_rewriter_system_prompt(now: datetime) -> str:
+def build_rewriter_system_prompt(
+    now: datetime,
+    dictionary: dict[str, str] | None = None,
+) -> str:
     """현재 시각과 용어 사전을 반영한 쿼리 리라이터 시스템 프롬프트를 생성한다.
 
     Args:
         now: 현재 시각. 상대적 시간 표현 해석의 기준이 된다.
+        dictionary: 용어 사전. None이면 용어 치환 규칙이 "없음"으로 표시.
 
     Returns:
         시스템 프롬프트 문자열.
     """
     return REWRITER_SYSTEM_PROMPT.format(
         now=now.strftime("%Y-%m-%d %H:%M (%A)"),
-        dictionary=_format_dictionary(TERM_DICTIONARY),
+        dictionary=_format_dictionary(dictionary or {}),
     )
 
 
