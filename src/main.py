@@ -11,7 +11,7 @@
 실행 흐름:
     [START] → [query_rewriter] → [supervisor] → (라우터) → [math_agent]      → [supervisor] → ...
                                                          → [translate_agent] → [supervisor]
-                                                         → END (FINISH)
+                                                         → [response_generator] → END (FINISH)
 """
 
 from dotenv import load_dotenv
@@ -23,6 +23,7 @@ from langgraph.graph import END, START, StateGraph
 
 from src.agents import registry
 from src.agents.query_rewriter import query_rewriter_node
+from src.agents.response_generator import response_generator_node
 from src.agents.supervisor import supervisor_node, supervisor_router
 from src.logging import get_logger, setup_logging
 from src.logging.diff import format_state_pretty
@@ -37,6 +38,7 @@ def build_graph():
 
     graph.add_node("query_rewriter", query_rewriter_node)
     graph.add_node("supervisor", supervisor_node)
+    graph.add_node("response_generator", response_generator_node)
 
     node_names: list[str] = []
     for entry in registry.entries:
@@ -49,8 +51,9 @@ def build_graph():
     graph.add_conditional_edges(
         "supervisor",
         supervisor_router,
-        [*node_names, END],
+        [*node_names, "response_generator"],
     )
+    graph.add_edge("response_generator", END)
 
     return graph.compile()
 
