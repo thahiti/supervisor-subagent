@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from src.agents.query_rewriter.dictionary_client import (
+    DictionaryClient,
+    MockDictionaryClient,
+)
 from src.agents.query_rewriter.tokenizer import extract_tokens
 
 
@@ -41,3 +45,24 @@ class TestExtractTokens:
     def test_no_tokens_in_plain_text(self) -> None:
         result = extract_tokens("오늘 매출을 알려주세요")
         assert result == []
+
+
+class TestMockDictionaryClient:
+    def test_returns_definitions_for_known_keys(self) -> None:
+        client = MockDictionaryClient({"KPI_01": "월간 매출 성장률", "ACC_RCV": "미수금 잔액"})
+        result = client.lookup(["KPI_01", "ACC_RCV"])
+        assert result == {"KPI_01": "월간 매출 성장률", "ACC_RCV": "미수금 잔액"}
+
+    def test_returns_empty_string_for_unknown_keys(self) -> None:
+        client = MockDictionaryClient({"KPI_01": "월간 매출 성장률"})
+        result = client.lookup(["KPI_01", "UNKNOWN"])
+        assert result == {"KPI_01": "월간 매출 성장률", "UNKNOWN": ""}
+
+    def test_empty_keys_returns_empty_dict(self) -> None:
+        client = MockDictionaryClient({"KPI_01": "월간 매출 성장률"})
+        result = client.lookup([])
+        assert result == {}
+
+    def test_implements_interface(self) -> None:
+        client = MockDictionaryClient({})
+        assert isinstance(client, DictionaryClient)
