@@ -4,12 +4,26 @@ from datetime import datetime
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
+from src.agents.query_rewriter.dictionary_client import DictionaryClient, MockDictionaryClient
 from src.agents.query_rewriter.prompt import build_rewriter_system_prompt
+from src.agents.query_rewriter.tokenizer import extract_tokens
 from src.llm import get_chat_model
 from src.logging import get_logger, log_node
 from src.state import State
 
 logger = get_logger("query_rewriter")
+
+_dictionary_client: DictionaryClient = MockDictionaryClient({
+    "KPI_01": "월간 매출 성장률",
+    "ACC_RCV": "미수금 잔액",
+    "NET_PRF": "순이익(매출 - 비용)",
+})
+
+
+def set_dictionary_client(client: DictionaryClient) -> None:
+    """딕셔너리 클라이언트를 교체한다 (테스트/프로덕션 전환용)."""
+    global _dictionary_client
+    _dictionary_client = client
 
 
 def _find_last_human_message(state: State) -> HumanMessage | None:
@@ -31,7 +45,14 @@ def query_rewriter_node(state: State) -> dict:
     original = last_human.content
     logger.info("원본 쿼리: %s", original)
 
-    system_prompt = build_rewriter_system_prompt(now=datetime.now())
+    tokens = extract_tokens(original)
+    dictionary: dict[str, str] = {}
+    if tokens:
+        lookup_result = _dictionary_client.lookup(tokens)
+        dictionary = {k: v for k, v in lookup_result.items() if v}
+        logger.info("토큰 조회: %s → %s", tokens, dictionary)
+
+    system_prompt = build_rewriter_system_prompt(now=datetime.now(), dictionary=dictionary)
     llm = get_chat_model()
 
     response = llm.invoke(
