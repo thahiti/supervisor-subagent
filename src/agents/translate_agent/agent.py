@@ -41,10 +41,7 @@ def translate_wrapper(state: State) -> dict:
     result = translate_agent_node({"messages": state["messages"]})
 
     last_message = result["messages"][-1]
-    completed = list(state.get("completed_agents", []))
-    completed.append("translate")
 
     return {
         "messages": [AIMessage(content=f"[번역 결과]\n{last_message.content}")],
-        "completed_agents": completed,
     }

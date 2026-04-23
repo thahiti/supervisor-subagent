@@ -139,10 +139,7 @@ def math_wrapper(state: State) -> dict:
         raise
 
     last_message = result["messages"][-1]
-    completed = list(state.get("completed_agents", []))
-    completed.append("math")
 
     return {
         "messages": [AIMessage(content=f"[수학 계산 결과]\n{last_message.content}")],
-        "completed_agents": completed,
     }
