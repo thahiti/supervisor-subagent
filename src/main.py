@@ -1,17 +1,18 @@
-"""Supervisor-Subagent 패턴 데모.
+"""Router-Subagent 패턴 데모.
 
 핵심 아이디어:
-- Supervisor가 사용자 요청을 분석하고 적절한 Subagent에게 작업을 위임한다.
+- Router가 사용자 요청을 분석하고 가장 적합한 단일 Subagent에게 작업을 위임한다.
+- 선택된 Subagent 실행 후 곧바로 response_generator로 이동한다.
 - Math Agent: 수학 계산 tool(add, multiply, divide)을 사용하는 ReAct 에이전트
 - Translate Agent: LLM 직접 호출로 영한 번역을 수행하는 에이전트
+- SQL Agent: ecommerce DB를 자연어로 질의하는 ReAct 에이전트
 
 실행 방법:
     uv run python -m src.main
 
 실행 흐름:
-    [START] → [query_rewriter] → [supervisor] → (라우터) → [math_agent]      → [supervisor] → ...
-                                                         → [translate_agent] → [supervisor]
-                                                         → [response_generator] → END (FINISH)
+    [START] → [query_rewriter] → [router] → [선택된 subagent] → [response_generator] → END
+                                         └→ [response_generator] (FINISH) ─────────→ END
 """
 
 from dotenv import load_dotenv
@@ -24,7 +25,7 @@ from langgraph.graph import END, START, StateGraph
 from src.agents import registry
 from src.agents.query_rewriter import query_rewriter_node
 from src.agents.response_generator import response_generator_node
-from src.agents.supervisor import supervisor_node, supervisor_router
+from src.agents.router import router_conditional, router_node
 from src.logging import get_logger, setup_logging
 from src.logging.diff import format_state_pretty
 from src.state import State
@@ -33,24 +34,24 @@ logger = get_logger("main")
 
 
 def build_graph():
-    """Supervisor-Subagent 메인 그래프를 빌드한다."""
+    """Router-Subagent 메인 그래프를 빌드한다."""
     graph = StateGraph(State)
 
     graph.add_node("query_rewriter", query_rewriter_node)
-    graph.add_node("supervisor", supervisor_node)
+    graph.add_node("router", router_node)
     graph.add_node("response_generator", response_generator_node)
 
     node_names: list[str] = []
     for entry in registry.entries:
         graph.add_node(entry.node_name, entry.wrapper)
-        graph.add_edge(entry.node_name, "supervisor")
+        graph.add_edge(entry.node_name, "response_generator")
         node_names.append(entry.node_name)
 
     graph.add_edge(START, "query_rewriter")
-    graph.add_edge("query_rewriter", "supervisor")
+    graph.add_edge("query_rewriter", "router")
     graph.add_conditional_edges(
-        "supervisor",
-        supervisor_router,
+        "router",
+        router_conditional,
         [*node_names, "response_generator"],
     )
     graph.add_edge("response_generator", END)
@@ -66,8 +67,6 @@ def run_scenario(app, name: str, description: str, user_message: str) -> None:
     result = app.invoke({
         "messages": [HumanMessage(content=user_message)],
         "next_agent": "",
-        "plan": "",
-        "completed_agents": [],
     })
 
     logger.info(
@@ -84,7 +83,7 @@ def run_scenario(app, name: str, description: str, user_message: str) -> None:
 
 def main():
     setup_logging()
-    logger.info("Supervisor-Subagent 패턴 데모 시작")
+    logger.info("Router-Subagent 패턴 데모 시작")
 
     app = build_graph()
 
