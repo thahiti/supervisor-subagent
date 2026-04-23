@@ -5,19 +5,15 @@ from langgraph.graph.message import add_messages
 
 
 class State(TypedDict):
-    """Supervisor-Subagent 시스템의 공유 상태.
+    """Router-Subagent 시스템의 공유 상태.
 
     Attributes:
         messages: 전체 대화 이력 (add_messages 리듀서로 자동 병합)
-        next_agent: 슈퍼바이저가 결정한 다음 워커 ("math" | "translate" | "FINISH")
-        plan: 슈퍼바이저의 실행 계획
-        completed_agents: 작업을 완료한 워커 목록
+        next_agent: 라우터가 결정한 다음 워커 (registry 이름 또는 "FINISH")
     """
 
     messages: Annotated[list[BaseMessage], add_messages]
     next_agent: str
-    plan: str
-    completed_agents: list[str]
 
 
 class WorkerState(TypedDict):
