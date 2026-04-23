@@ -118,10 +118,7 @@ def sql_wrapper(state: State) -> dict:
         raise
 
     last_message = result["messages"][-1]
-    completed = list(state.get("completed_agents", []))
-    completed.append("sql")
 
     return {
         "messages": [AIMessage(content=f"[SQL 조회 결과]\n{last_message.content}")],
-        "completed_agents": completed,
     }
