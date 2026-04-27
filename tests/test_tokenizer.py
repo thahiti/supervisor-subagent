@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from src.agents.query_rewriter.dictionary_client import (
+from src.query_rewriter.dictionary_client import (
     DictionaryClient,
     MockDictionaryClient,
 )
-from src.agents.query_rewriter.tokenizer import extract_tokens, tokenize
+from src.query_rewriter.tokenizer import extract_tokens, tokenize
 
 
 class TestExtractTokens:

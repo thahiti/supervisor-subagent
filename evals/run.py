@@ -17,7 +17,7 @@ load_dotenv()
 from src.logging import setup_logging
 
 # registry에 에이전트를 등록하기 위해 import
-import src.agents  # noqa: F401
+import src  # noqa: F401
 
 from evals.runner import load_from_dir, print_results, run_all_tests
 

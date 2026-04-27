@@ -2,7 +2,7 @@
 
 from langchain_core.messages import AIMessage, SystemMessage
 
-from src.agents.response_generator.prompt import RESPONSE_GENERATOR_SYSTEM_PROMPT
+from src.response_generator.prompt import RESPONSE_GENERATOR_SYSTEM_PROMPT
 from src.llm import get_chat_model
 from src.logging import get_logger, log_node
 from src.state import State

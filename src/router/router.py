@@ -8,7 +8,7 @@ import json
 
 from langchain_core.messages import AIMessage, SystemMessage
 
-from src.agents.registry import registry
+from src.registry import registry
 from src.llm import get_chat_model
 from src.logging import get_logger, log_node
 from src.state import State

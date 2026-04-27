@@ -12,11 +12,11 @@ from unittest.mock import MagicMock, patch
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
-from src.agents.query_rewriter.prompt import (
+from src.query_rewriter.prompt import (
     _format_dictionary,
     build_rewriter_system_prompt,
 )
-from src.agents.query_rewriter.rewriter import _find_last_human_message, query_rewriter_node
+from src.query_rewriter.rewriter import _find_last_human_message, query_rewriter_node
 
 
 class TestPrompt:
@@ -73,7 +73,7 @@ class TestFindLastHumanMessage:
 
 
 class TestQueryRewriterNode:
-    @patch("src.agents.query_rewriter.rewriter.get_chat_model")
+    @patch("src.query_rewriter.rewriter.get_chat_model")
     def test_returns_rewritten_message(self, mock_get_model: MagicMock) -> None:
         mock_llm = MagicMock()
         mock_llm.invoke.return_value = MagicMock(content="2026-04-13~2026-04-19 매출 알려줘")
@@ -91,7 +91,7 @@ class TestQueryRewriterNode:
         assert isinstance(result["messages"][0], HumanMessage)
         assert "2026-04-13" in result["messages"][0].content
 
-    @patch("src.agents.query_rewriter.rewriter.get_chat_model")
+    @patch("src.query_rewriter.rewriter.get_chat_model")
     def test_skips_when_no_change(self, mock_get_model: MagicMock) -> None:
         original = "3과 7을 더해주세요"
         mock_llm = MagicMock()
@@ -119,7 +119,7 @@ class TestQueryRewriterNode:
         result = query_rewriter_node(state)
         assert result["messages"] == []
 
-    @patch("src.agents.query_rewriter.rewriter.get_chat_model")
+    @patch("src.query_rewriter.rewriter.get_chat_model")
     def test_passes_full_conversation_to_llm(self, mock_get_model: MagicMock) -> None:
         mock_llm = MagicMock()
         mock_llm.invoke.return_value = MagicMock(content="이전 번역 결과를 영어로 다시 번역해줘")

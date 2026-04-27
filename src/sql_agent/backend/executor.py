@@ -16,8 +16,8 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterator, TypedDict
 
-from src.agents.sql_agent.backend.formatter import to_markdown_table
-from src.agents.sql_agent.backend.safety import (
+from src.sql_agent.backend.formatter import to_markdown_table
+from src.sql_agent.backend.safety import (
     UnsafeSqlError,
     inject_limit_if_missing,
     validate_select_only,
