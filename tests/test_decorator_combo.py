@@ -7,7 +7,7 @@ import logging
 
 import pytest
 
-from src.agents.registry import AgentRegistry
+from src.registry import AgentRegistry
 from src.logging.decorator import log_node
 from src.state import State
 

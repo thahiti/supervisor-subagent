@@ -1,38 +1,59 @@
-"""Text-to-SQL 프론트엔드 에이전트 (ReAct 서브그래프).
-
-도메인 인식 레이어. 시스템 프롬프트에 스키마 + few-shot을 주입하고,
-Backend를 감싼 tools를 LLM에 바인딩해 자연어 → SQL → 실행 → 설명의
-루프를 수행한다.
-"""
-
-from langchain_core.messages import AIMessage, SystemMessage, ToolMessage
+from langchain_core.messages import AIMessage, ToolMessage, SystemMessage
+from langchain_core.tools import tool
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
-from src.agents.registry import registry
-from src.agents.sql_agent.frontend.prompt import build_system_prompt
-from src.agents.sql_agent.tools import SQL_TOOLS, SQL_TOOLS_BY_NAME
+from src.registry import registry
 from src.llm import get_chat_model
 from src.logging import get_logger, log_node
 from src.state import State, WorkerState
 
-logger = get_logger("agent.sql")
-router_logger = get_logger("router.sql")
+logger = get_logger("agent.math")
+router_logger = get_logger("router.math")
 
 
-def build_sql_agent() -> CompiledStateGraph:
-    """SQL 에이전트 ReAct 서브그래프를 빌드한다."""
+@tool
+def add(a: float, b: float) -> float:
+    """두 수를 더한다."""
+    return a + b
 
-    system_prompt = build_system_prompt()
 
-    @log_node("sql_agent_internal")
-    def sql_agent_node(state: WorkerState) -> dict:
+@tool
+def multiply(a: float, b: float) -> float:
+    """두 수를 곱한다."""
+    return a * b
+
+
+@tool
+def divide(a: float, b: float) -> str:
+    """두 수를 나눈다. 0으로 나누면 오류 메시지를 반환한다."""
+    if b == 0:
+        logger.warning("0으로 나누기 시도: a=%s, b=%s", a, b)
+        return "오류: 0으로 나눌 수 없습니다."
+    return str(a / b)
+
+
+MATH_TOOLS = [add, multiply, divide]
+MATH_TOOLS_BY_NAME = {t.name: t for t in MATH_TOOLS}
+
+
+def build_math_agent() -> CompiledStateGraph:
+    """수학 계산 에이전트 서브그래프를 빌드한다."""
+
+    @log_node("math_agent_internal")
+    def math_agent_node(state: WorkerState) -> dict:
         llm = get_chat_model()
-        llm_with_tools = llm.bind_tools(SQL_TOOLS)
+        llm_with_tools = llm.bind_tools(MATH_TOOLS)
 
-        messages = [SystemMessage(content=system_prompt)] + state["messages"]
+        system_msg = SystemMessage(content=(
+            "당신은 수학 계산 전문 에이전트입니다.\n"
+            "사용자의 요청에 따라 add, multiply, divide 도구를 사용하여 계산하세요.\n"
+            "계산 결과를 명확하게 한국어로 설명하세요."
+        ))
 
-        logger.info("LLM 호출 시작 (tools=%d)", len(SQL_TOOLS))
+        messages = [system_msg] + state["messages"]
+
+        logger.info("LLM 호출 시작 (model=gpt-4o-mini, tools=%d)", len(MATH_TOOLS))
         try:
             response = llm_with_tools.invoke(messages)
         except Exception:
@@ -43,21 +64,22 @@ def build_sql_agent() -> CompiledStateGraph:
         if tool_calls:
             logger.info(
                 "LLM tool_calls: %s",
-                [(tc["name"], _truncate_args(tc["args"])) for tc in tool_calls],
+                [(tc["name"], tc["args"]) for tc in tool_calls],
             )
         else:
-            logger.info("LLM 최종 응답: %s", str(response.content)[:200])
+            logger.info("LLM 최종 응답: %s", response.content)
 
         return {"messages": [response]}
 
-    @log_node("sql_tool_executor")
+    @log_node("math_tool_executor")
     def tool_executor_node(state: WorkerState) -> dict:
+        """tool_calls를 실행하고 결과를 ToolMessage로 반환한다."""
         last_message = state["messages"][-1]
         tool_calls = getattr(last_message, "tool_calls", [])
 
         results: list[ToolMessage] = []
         for tc in tool_calls:
-            tool_fn = SQL_TOOLS_BY_NAME.get(tc["name"])
+            tool_fn = MATH_TOOLS_BY_NAME.get(tc["name"])
             if tool_fn is None:
                 logger.error("알 수 없는 tool: %s", tc["name"])
                 results.append(ToolMessage(
@@ -66,9 +88,10 @@ def build_sql_agent() -> CompiledStateGraph:
                 ))
                 continue
 
-            logger.info("tool 실행: %s(%s)", tc["name"], _truncate_args(tc["args"]))
+            logger.info("tool 실행: %s(%s)", tc["name"], tc["args"])
             try:
                 result = tool_fn.invoke(tc["args"])
+                logger.info("tool 결과: %s → %s", tc["name"], result)
                 results.append(ToolMessage(
                     content=str(result),
                     tool_call_id=tc["id"],
@@ -92,27 +115,25 @@ def build_sql_agent() -> CompiledStateGraph:
         return decision
 
     graph = StateGraph(WorkerState)
-    graph.add_node("agent", sql_agent_node)
+
+    graph.add_node("agent", math_agent_node)
     graph.add_node("tools", tool_executor_node)
+
     graph.add_edge(START, "agent")
     graph.add_conditional_edges("agent", should_continue, ["tools", END])
     graph.add_edge("tools", "agent")
+
     return graph.compile()
 
 
-def _truncate_args(args: object, limit: int = 120) -> str:
-    text = str(args)
-    return text if len(text) <= limit else text[:limit] + "…"
+math_subgraph = build_math_agent()
 
 
-sql_subgraph = build_sql_agent()
-
-
-@registry.agent("sql")
-def sql_wrapper(state: State) -> dict:
-    """자연어로 ecommerce 데이터베이스(직원/부서/고객/제품/주문)를 질의합니다. SQL 쿼리가 필요한 데이터 조회, 집계, 분석에 사용합니다."""
+@registry.agent("math")
+def math_wrapper(state: State) -> dict:
+    """수학 계산을 수행합니다. 덧셈, 곱셈, 나눗셈 등의 계산이 필요할 때 사용합니다."""
     try:
-        result = sql_subgraph.invoke({"messages": state["messages"]})
+        result = math_subgraph.invoke({"messages": state["messages"]})
     except Exception:
         logger.error("서브그래프 실행 실패", exc_info=True)
         raise
@@ -120,5 +141,5 @@ def sql_wrapper(state: State) -> dict:
     last_message = result["messages"][-1]
 
     return {
-        "messages": [AIMessage(content=f"[SQL 조회 결과]\n{last_message.content}")],
+        "messages": [AIMessage(content=f"[수학 계산 결과]\n{last_message.content}")],
     }

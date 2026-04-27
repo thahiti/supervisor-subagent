@@ -3,8 +3,8 @@
 스키마 DDL과 few-shot 예시를 주입해 도메인 인식 프롬프트를 조립한다.
 """
 
-from src.agents.sql_agent.frontend.few_shots import format_few_shots
-from src.agents.sql_agent.frontend.schema import SCHEMA_DDL
+from src.sql_agent.frontend.few_shots import format_few_shots
+from src.sql_agent.frontend.schema import SCHEMA_DDL
 
 _SYSTEM_PROMPT_TEMPLATE = """\
 당신은 SQLite 기반 ecommerce 데이터베이스 질의 전문가입니다.

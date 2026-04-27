@@ -4,9 +4,9 @@ from datetime import datetime
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from src.agents.query_rewriter.dictionary_client import DictionaryClient, MockDictionaryClient
-from src.agents.query_rewriter.prompt import build_rewriter_system_prompt
-from src.agents.query_rewriter.tokenizer import extract_tokens
+from src.query_rewriter.dictionary_client import DictionaryClient, MockDictionaryClient
+from src.query_rewriter.prompt import build_rewriter_system_prompt
+from src.query_rewriter.tokenizer import extract_tokens
 from src.llm import get_chat_model
 from src.logging import get_logger, log_node
 from src.state import State

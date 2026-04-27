@@ -100,7 +100,7 @@ def _invoke_agent(
     Returns:
         에이전트의 최종 출력 텍스트
     """
-    from src.agents.registry import registry
+    from src.registry import registry
 
     entry = registry.get(target_agent)
     if entry is None:

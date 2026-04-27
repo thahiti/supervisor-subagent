@@ -11,9 +11,9 @@ from pathlib import Path
 
 import pytest
 
-from src.agents.registry import registry
-from src.agents.sql_agent.backend import SqlExecutor
-from src.agents.sql_agent import tools as sql_tools
+from src.registry import registry
+from src.sql_agent.backend import SqlExecutor
+from src.sql_agent import tools as sql_tools
 
 
 @pytest.fixture
@@ -66,7 +66,7 @@ class TestToolAdapters:
 
 class TestRegistration:
     def test_sql_agent_in_registry(self) -> None:
-        import src.agents  # noqa: F401
+        import src  # noqa: F401
 
         entry = registry.get("sql")
         assert entry is not None
@@ -74,7 +74,7 @@ class TestRegistration:
         assert "ecommerce" in entry.description.lower() or "데이터베이스" in entry.description
 
     def test_workers_prompt_includes_sql(self) -> None:
-        import src.agents  # noqa: F401
+        import src  # noqa: F401
 
         prompt = registry.build_workers_prompt()
         assert "**sql**" in prompt

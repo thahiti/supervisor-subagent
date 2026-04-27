@@ -2,7 +2,7 @@
 
 import re
 
-from src.agents.query_rewriter.dictionary_client import DictionaryClient
+from src.query_rewriter.dictionary_client import DictionaryClient
 
 _TOKEN_PATTERN = re.compile(r"([A-Z][A-Z0-9_&-]{2,})(?![A-Za-z0-9_&-])")
 

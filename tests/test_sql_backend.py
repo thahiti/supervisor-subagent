@@ -11,8 +11,8 @@ from pathlib import Path
 
 import pytest
 
-from src.agents.sql_agent.backend import SqlExecutor
-from src.agents.sql_agent.backend.safety import (
+from src.sql_agent.backend import SqlExecutor
+from src.sql_agent.backend.safety import (
     UnsafeSqlError,
     inject_limit_if_missing,
     validate_select_only,
@@ -128,7 +128,7 @@ class TestExecute:
     ) -> None:
         """safety를 우회해도 read-only URI가 막는다 (defense-in-depth)."""
         monkeypatch.setattr(
-            "src.agents.sql_agent.backend.executor.validate_select_only",
+            "src.sql_agent.backend.executor.validate_select_only",
             lambda q: None,
         )
         r = executor.execute("UPDATE items SET qty = 0")

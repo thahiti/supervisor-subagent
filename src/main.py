@@ -22,10 +22,10 @@ load_dotenv()
 from langchain_core.messages import HumanMessage
 from langgraph.graph import END, START, StateGraph
 
-from src.agents import registry
-from src.agents.query_rewriter import query_rewriter_node
-from src.agents.response_generator import response_generator_node
-from src.agents.router import router_conditional, router_node
+from src.registry import registry
+from src.query_rewriter import query_rewriter_node
+from src.response_generator import response_generator_node
+from src.router import router_conditional, router_node
 from src.logging import get_logger, setup_logging
 from src.logging.diff import format_state_pretty
 from src.state import State

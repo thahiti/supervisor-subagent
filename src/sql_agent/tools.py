@@ -10,7 +10,7 @@ from pathlib import Path
 
 from langchain_core.tools import tool
 
-from src.agents.sql_agent.backend import SqlExecutor
+from src.sql_agent.backend import SqlExecutor
 
 DEFAULT_DB_PATH = Path(__file__).resolve().parents[3] / "res" / "sample_db" / "ecommerce.db"
 

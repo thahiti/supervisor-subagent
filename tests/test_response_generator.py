@@ -5,7 +5,7 @@ LLM 호출 없이 프롬프트 구성과 노드 로직을 검증한다.
 
 from __future__ import annotations
 
-from src.agents.response_generator.prompt import RESPONSE_GENERATOR_SYSTEM_PROMPT
+from src.response_generator.prompt import RESPONSE_GENERATOR_SYSTEM_PROMPT
 
 
 class TestPrompt:
@@ -21,11 +21,11 @@ from unittest.mock import MagicMock, patch
 
 from langchain_core.messages import AIMessage, HumanMessage
 
-from src.agents.response_generator.generator import response_generator_node
+from src.response_generator.generator import response_generator_node
 
 
 class TestResponseGeneratorNode:
-    @patch("src.agents.response_generator.generator.get_chat_model")
+    @patch("src.response_generator.generator.get_chat_model")
     def test_returns_ai_message(self, mock_get_model: MagicMock) -> None:
         mock_llm = MagicMock()
         mock_llm.invoke.return_value = MagicMock(content="연봉 5천만원 이상 직원은 3명입니다.")
@@ -48,7 +48,7 @@ class TestResponseGeneratorNode:
         assert isinstance(result["messages"][0], AIMessage)
         assert "3명" in result["messages"][0].content
 
-    @patch("src.agents.response_generator.generator.get_chat_model")
+    @patch("src.response_generator.generator.get_chat_model")
     def test_passes_system_prompt_and_messages(self, mock_get_model: MagicMock) -> None:
         mock_llm = MagicMock()
         mock_llm.invoke.return_value = MagicMock(content="답변")
@@ -70,7 +70,7 @@ class TestResponseGeneratorNode:
         # 시스템 프롬프트 1개 + 대화 메시지 2개 = 총 3개
         assert len(call_args) == 3
 
-    @patch("src.agents.response_generator.generator.get_chat_model")
+    @patch("src.response_generator.generator.get_chat_model")
     def test_handles_multi_agent_results(self, mock_get_model: MagicMock) -> None:
         mock_llm = MagicMock()
         mock_llm.invoke.return_value = MagicMock(
@@ -96,7 +96,7 @@ class TestResponseGeneratorNode:
         assert len(result["messages"]) == 1
         assert isinstance(result["messages"][0], AIMessage)
 
-from src.agents.supervisor.supervisor import supervisor_router
+from src.supervisor.supervisor import supervisor_router
 
 
 class TestSupervisorRouterChange:
@@ -121,7 +121,7 @@ class TestSupervisorRouterChange:
         assert result == "response_generator"
 
     def test_agent_routes_normally(self) -> None:
-        import src.agents  # noqa: F401
+        import src  # noqa: F401
         state = {
             "messages": [],
             "next_agent": "math",
