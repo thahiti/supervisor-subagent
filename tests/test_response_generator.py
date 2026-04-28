@@ -96,6 +96,82 @@ class TestResponseGeneratorNode:
         assert len(result["messages"]) == 1
         assert isinstance(result["messages"][0], AIMessage)
 
+    @patch("src.response_generator.generator.get_chat_model")
+    def test_returns_chat_history_with_two_messages(self, mock_get_model: MagicMock) -> None:
+        mock_llm = MagicMock()
+        mock_llm.invoke.return_value = MagicMock(content="최종 출력")
+        mock_get_model.return_value = mock_llm
+
+        state = {
+            "messages": [
+                HumanMessage(content="리라이팅된 질의"),
+                AIMessage(content="에이전트 결과"),
+            ],
+            "next_agent": "FINISH",
+            "chat_history": [],
+        }
+
+        result = response_generator_node(state)
+        assert "chat_history" in result
+        assert len(result["chat_history"]) == 2
+
+    @patch("src.response_generator.generator.get_chat_model")
+    def test_chat_history_first_is_last_human_message(self, mock_get_model: MagicMock) -> None:
+        mock_llm = MagicMock()
+        mock_llm.invoke.return_value = MagicMock(content="최종 출력")
+        mock_get_model.return_value = mock_llm
+
+        state = {
+            "messages": [
+                HumanMessage(content="원본 질의"),
+                HumanMessage(content="리라이팅된 질의"),
+                AIMessage(content="에이전트 결과"),
+            ],
+            "next_agent": "FINISH",
+            "chat_history": [],
+        }
+
+        result = response_generator_node(state)
+        first = result["chat_history"][0]
+        assert isinstance(first, HumanMessage)
+        assert first.content == "리라이팅된 질의"
+
+    @patch("src.response_generator.generator.get_chat_model")
+    def test_chat_history_second_is_generated_ai_message(self, mock_get_model: MagicMock) -> None:
+        mock_llm = MagicMock()
+        mock_llm.invoke.return_value = MagicMock(content="최종 출력")
+        mock_get_model.return_value = mock_llm
+
+        state = {
+            "messages": [
+                HumanMessage(content="질의"),
+                AIMessage(content="에이전트 결과"),
+            ],
+            "next_agent": "FINISH",
+            "chat_history": [],
+        }
+
+        result = response_generator_node(state)
+        second = result["chat_history"][1]
+        assert isinstance(second, AIMessage)
+        assert second.content == "최종 출력"
+
+    @patch("src.response_generator.generator.get_chat_model")
+    def test_omits_chat_history_when_no_human_message(self, mock_get_model: MagicMock) -> None:
+        mock_llm = MagicMock()
+        mock_llm.invoke.return_value = MagicMock(content="최종 출력")
+        mock_get_model.return_value = mock_llm
+
+        state = {
+            "messages": [AIMessage(content="ai only")],
+            "next_agent": "FINISH",
+            "chat_history": [],
+        }
+
+        result = response_generator_node(state)
+        assert "chat_history" not in result
+        assert "messages" in result
+
 from src.supervisor.supervisor import supervisor_router
 
 
