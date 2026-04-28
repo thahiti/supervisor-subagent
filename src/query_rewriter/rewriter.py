@@ -55,8 +55,11 @@ def query_rewriter_node(state: State) -> dict:
     system_prompt = build_rewriter_system_prompt(now=datetime.now(), dictionary=dictionary)
     llm = get_chat_model()
 
+    chat_history = state.get("chat_history", [])
     response = llm.invoke(
-        [SystemMessage(content=system_prompt)] + list(state["messages"]),
+        [SystemMessage(content=system_prompt)]
+        + list(chat_history)
+        + [HumanMessage(content=original)],
     )
 
     rewritten: str = response.content  # type: ignore[assignment]
