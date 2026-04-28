@@ -82,8 +82,7 @@ class TestQueryRewriterNode:
         state = {
             "messages": [HumanMessage(content="지난주 매출 알려줘")],
             "next_agent": "",
-            "plan": "",
-            "completed_agents": [],
+            "chat_history": [],
         }
 
         result = query_rewriter_node(state)
@@ -101,8 +100,7 @@ class TestQueryRewriterNode:
         state = {
             "messages": [HumanMessage(content=original)],
             "next_agent": "",
-            "plan": "",
-            "completed_agents": [],
+            "chat_history": [],
         }
 
         result = query_rewriter_node(state)
@@ -112,32 +110,52 @@ class TestQueryRewriterNode:
         state = {
             "messages": [AIMessage(content="ai only")],
             "next_agent": "",
-            "plan": "",
-            "completed_agents": [],
+            "chat_history": [],
         }
 
         result = query_rewriter_node(state)
         assert result["messages"] == []
 
     @patch("src.query_rewriter.rewriter.get_chat_model")
-    def test_passes_full_conversation_to_llm(self, mock_get_model: MagicMock) -> None:
+    def test_passes_empty_chat_history_to_llm(self, mock_get_model: MagicMock) -> None:
         mock_llm = MagicMock()
-        mock_llm.invoke.return_value = MagicMock(content="이전 번역 결과를 영어로 다시 번역해줘")
+        mock_llm.invoke.return_value = MagicMock(content="리라이팅 결과")
         mock_get_model.return_value = mock_llm
 
         state = {
-            "messages": [
-                HumanMessage(content="Hello를 한국어로 번역해줘"),
-                AIMessage(content="안녕하세요"),
-                HumanMessage(content="이거 다시 영어로 해줘"),
-            ],
+            "messages": [HumanMessage(content="현재 질의")],
             "next_agent": "",
-            "plan": "",
-            "completed_agents": [],
+            "chat_history": [],
         }
 
         query_rewriter_node(state)
 
         call_args = mock_llm.invoke.call_args[0][0]
-        # 시스템 프롬프트 + 대화 메시지 3개 = 총 4개
+        # SystemMessage + 현재 HumanMessage = 2개
+        assert len(call_args) == 2
+        assert call_args[1].content == "현재 질의"
+
+    @patch("src.query_rewriter.rewriter.get_chat_model")
+    def test_passes_nonempty_chat_history_to_llm(self, mock_get_model: MagicMock) -> None:
+        mock_llm = MagicMock()
+        mock_llm.invoke.return_value = MagicMock(content="리라이팅 결과")
+        mock_get_model.return_value = mock_llm
+
+        chat_history = [
+            HumanMessage(content="과거 질의"),
+            AIMessage(content="과거 출력"),
+        ]
+        state = {
+            "messages": [HumanMessage(content="현재 질의")],
+            "next_agent": "",
+            "chat_history": chat_history,
+        }
+
+        query_rewriter_node(state)
+
+        call_args = mock_llm.invoke.call_args[0][0]
+        # SystemMessage + chat_history 2개 + 현재 HumanMessage = 4개
         assert len(call_args) == 4
+        assert call_args[1].content == "과거 질의"
+        assert call_args[2].content == "과거 출력"
+        assert call_args[3].content == "현재 질의"
