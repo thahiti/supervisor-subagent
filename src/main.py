@@ -67,6 +67,7 @@ def run_scenario(app, name: str, description: str, user_message: str) -> None:
     result = app.invoke({
         "messages": [HumanMessage(content=user_message)],
         "next_agent": "",
+        "chat_history": [],
     })
 
     logger.info(
