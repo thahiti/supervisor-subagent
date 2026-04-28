@@ -81,6 +81,45 @@ def run_scenario(app, name: str, description: str, user_message: str) -> None:
     )
 
 
+def run_multiturn_scenario(
+    app,
+    name: str,
+    description: str,
+    first_message: str,
+    second_message: str,
+) -> None:
+    """1차 invoke의 chat_history를 2차 invoke에 인계하는 멀티턴 시나리오."""
+    logger.info("시나리오 %s: %s", name, description)
+    logger.info("1차 입력: %s", first_message)
+
+    first_result = app.invoke({
+        "messages": [HumanMessage(content=first_message)],
+        "next_agent": "",
+        "chat_history": [],
+    })
+
+    chat_history = first_result.get("chat_history", [])
+    logger.info("1차 종료 후 chat_history 길이: %d", len(chat_history))
+
+    logger.info("2차 입력: %s", second_message)
+    second_result = app.invoke({
+        "messages": [HumanMessage(content=second_message)],
+        "next_agent": "",
+        "chat_history": chat_history,
+    })
+
+    logger.info(
+        "\n%s\n"
+        "  [SCENARIO %s] Finished\n"
+        "%s\n"
+        "  Final State (turn 2):\n%s\n"
+        "%s",
+        "=" * 60, name, "=" * 60,
+        format_state_pretty(second_result),
+        "=" * 60,
+    )
+
+
 def main():
     setup_logging()
     logger.info("Router-Subagent 패턴 데모 시작")
@@ -105,6 +144,12 @@ def main():
     run_scenario(
         app, "D", "SQL 조회",
         "연봉이 5천만원 이상인 직원은 몇 명인가요?",
+    )
+
+    run_multiturn_scenario(
+        app, "E", "멀티턴 — 1차 결과를 chat_history로 인계해 2차 맥락 보충",
+        "Hello, how are you?를 한국어로 번역해주세요",
+        "이거 다시 영어로 번역해주세요",
     )
 
 
