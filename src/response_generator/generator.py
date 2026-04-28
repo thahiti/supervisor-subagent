@@ -42,7 +42,7 @@ def response_generator_node(state: State) -> dict:
     if last_human is not None:
         update["chat_history"] = [
             HumanMessage(content=last_human.content),
-            final_ai,
+            AIMessage(content=content),
         ]
 
     return update
