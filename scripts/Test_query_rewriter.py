@@ -42,40 +42,205 @@ class TestCase(TypedDict):
 
 
 TEST_CASES: list[TestCase] = [
+    # ─── 기본 7건 (일/주/월/최근 N일) ───
     {
-        "category": "상대시간:오늘",
+        "category": "일:오늘",
         "input": "오늘 매출 알려줘",
         "expected_patterns": [r"2026-04-29"],
     },
     {
-        "category": "상대시간:어제",
+        "category": "일:어제",
         "input": "어제 매출 알려줘",
         "expected_patterns": [r"2026-04-28"],
     },
     {
-        "category": "상대시간:지난주",
+        "category": "주:지난주",
         "input": "지난주 매출 알려줘",
         "expected_patterns": [r"2026-04-20", r"2026-04-26"],
     },
     {
-        "category": "상대시간:이번 주",
+        "category": "주:이번 주",
         "input": "이번 주 매출 알려줘",
         "expected_patterns": [r"2026-04-27", r"2026-04-29"],
     },
     {
-        "category": "상대시간:지난달",
+        "category": "월:지난달",
         "input": "지난달 매출 알려줘",
         "expected_patterns": [r"2026-03-01", r"2026-03-31"],
     },
     {
-        "category": "상대시간:이번 달",
+        "category": "월:이번 달",
         "input": "이번 달 매출 알려줘",
         "expected_patterns": [r"2026-04-01", r"2026-04-29"],
     },
     {
-        "category": "상대시간:최근 7일",
+        "category": "최근:N일",
         "input": "최근 7일 매출 알려줘",
         "expected_patterns": [r"2026-04-22", r"2026-04-29"],
+    },
+
+    # ─── 일 단위 추가 (5건) ───
+    {
+        "category": "일:그저께",
+        "input": "그저께 매출 정리해줘",
+        "expected_patterns": [r"2026-04-27"],
+    },
+    {
+        "category": "일:내일",
+        "input": "내일 일정 알려줘",
+        "expected_patterns": [r"2026-04-30"],
+    },
+    {
+        "category": "일:모레",
+        "input": "모레 회의 정리",
+        "expected_patterns": [r"2026-05-01"],
+    },
+    {
+        "category": "일:N일 전",
+        "input": "3일 전 데이터 보여줘",
+        "expected_patterns": [r"2026-04-26"],
+    },
+    {
+        "category": "일:N일 후",
+        "input": "5일 후 예상 매출",
+        "expected_patterns": [r"2026-05-04"],
+    },
+
+    # ─── 주 단위 추가 (4건) ───
+    {
+        "category": "주:이번 주 월요일",
+        "input": "이번 주 월요일 매출 알려줘",
+        "expected_patterns": [r"2026-04-27"],
+    },
+    {
+        "category": "주:지난주 금요일",
+        "input": "지난주 금요일 보고서 보여줘",
+        "expected_patterns": [r"2026-04-24"],
+    },
+    {
+        "category": "주:다음 주",
+        "input": "다음 주 매출 예측",
+        "expected_patterns": [r"2026-05-04", r"2026-05-10"],
+    },
+    {
+        "category": "주:이번 주말",
+        "input": "이번 주말 매출",
+        "expected_patterns": [r"2026-05-02", r"2026-05-03"],
+    },
+
+    # ─── 월 단위 추가 (4건) ───
+    {
+        "category": "월:다음 달",
+        "input": "다음 달 예산 알려줘",
+        "expected_patterns": [r"2026-05-01", r"2026-05-31"],
+    },
+    {
+        "category": "월:N개월 전",
+        "input": "3개월 전 매출",
+        "expected_patterns": [r"2026-01"],
+    },
+    {
+        "category": "월:최근 N개월",
+        "input": "최근 2개월 데이터",
+        "expected_patterns": [r"2026-(02|03)", r"2026-04-29"],
+    },
+    {
+        "category": "월:지난달 말",
+        "input": "지난달 말 매출",
+        "expected_patterns": [r"2026-03-31"],
+    },
+
+    # ─── 년도 표현 (4건) ───
+    {
+        "category": "년:작년",
+        "input": "작년 매출",
+        "expected_patterns": [r"2025-01-01", r"2025-12-31"],
+    },
+    {
+        "category": "년:올해 N월",
+        "input": "올해 1월 매출",
+        "expected_patterns": [r"2026-01-01", r"2026-01-31"],
+    },
+    {
+        "category": "년:재작년",
+        "input": "재작년 데이터",
+        "expected_patterns": [r"2024-01-01", r"2024-12-31"],
+    },
+    {
+        "category": "년:지난해 상반기",
+        "input": "지난해 상반기 매출",
+        "expected_patterns": [r"2025-01-01", r"2025-06-30"],
+    },
+
+    # ─── 분기/반기 (4건) ───
+    {
+        "category": "분기:1분기",
+        "input": "1분기 매출",
+        "expected_patterns": [r"2026-01-01", r"2026-03-31"],
+    },
+    {
+        "category": "분기:지난 분기",
+        "input": "지난 분기 데이터",
+        "expected_patterns": [r"2026-01-01", r"2026-03-31"],
+    },
+    {
+        "category": "분기:이번 분기",
+        "input": "이번 분기 매출",
+        "expected_patterns": [r"2026-04-01", r"2026-06-30"],
+    },
+    {
+        "category": "반기:올해 상반기",
+        "input": "올해 상반기 매출",
+        "expected_patterns": [r"2026-01-01", r"2026-06-30"],
+    },
+
+    # ─── 근사/모호 표현 (5건) ───
+    {
+        "category": "근사:날짜 경",
+        "input": "4/17일 경 매출 알려줘",
+        "expected_patterns": [r"2026-04-17"],
+    },
+    {
+        "category": "근사:지난주 쯤",
+        "input": "지난주 쯤 보고서",
+        "expected_patterns": [r"2026-04-20", r"2026-04-26"],
+    },
+    {
+        "category": "근사:이번 달 중순",
+        "input": "이번 달 중순 매출",
+        "expected_patterns": [r"2026-04-15"],
+    },
+    {
+        "category": "근사:월초",
+        "input": "이번 달 월초 매출",
+        "expected_patterns": [r"2026-04-0[1-7]"],
+    },
+    {
+        "category": "근사:월말",
+        "input": "이번 달 월말 마감",
+        "expected_patterns": [r"2026-04-(2[5-9]|30)"],
+    },
+
+    # ─── 자연어 날짜 → ISO 변환 (4건) ───
+    {
+        "category": "자연어:N월 N일",
+        "input": "4월 17일 매출",
+        "expected_patterns": [r"2026-04-17"],
+    },
+    {
+        "category": "자연어:지난달 N일",
+        "input": "지난달 15일 데이터",
+        "expected_patterns": [r"2026-03-15"],
+    },
+    {
+        "category": "자연어:부터~까지 기간",
+        "input": "4월 1일부터 4월 7일까지 매출",
+        "expected_patterns": [r"2026-04-01", r"2026-04-07"],
+    },
+    {
+        "category": "자연어:최근 한 달",
+        "input": "최근 한 달 매출 추이",
+        "expected_patterns": [r"2026-03-(29|30)", r"2026-04-29"],
     },
 ]
 
