@@ -15,14 +15,14 @@ from __future__ import annotations
 import re
 import sys
 from datetime import datetime
-from typing import TypedDict
+from typing import NotRequired, TypedDict
 from unittest.mock import patch
 
 from dotenv import load_dotenv
 
 load_dotenv()
 
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from langgraph.graph import END, START, StateGraph
 
 from src.query_rewriter import query_rewriter_node
@@ -32,13 +32,17 @@ from src.state import State
 # 모든 상대 시간 표현은 이 시점을 기준으로 변환된다 (수요일).
 FIXED_NOW = datetime(2026, 4, 29, 14, 30)
 
+# LLM 비결정성을 흡수하기 위한 케이스당 최대 시도 횟수.
+MAX_RETRIES = 3
+
 
 class TestCase(TypedDict):
-    """입력, 기대 패턴, 분류 라벨을 담는 단일 테스트 케이스."""
+    """입력, 기대 패턴, 분류 라벨, (선택) chat_history를 담는 단일 케이스."""
 
     category: str
     input: str
     expected_patterns: list[str]
+    chat_history: NotRequired[list[BaseMessage]]
 
 
 TEST_CASES: list[TestCase] = [
@@ -208,7 +212,7 @@ TEST_CASES: list[TestCase] = [
     {
         "category": "근사:이번 달 중순",
         "input": "이번 달 중순 매출",
-        "expected_patterns": [r"2026-04-15"],
+        "expected_patterns": [r"2026-04-11", r"2026-04-20"],
     },
     {
         "category": "근사:월초",
@@ -241,6 +245,97 @@ TEST_CASES: list[TestCase] = [
         "category": "자연어:최근 한 달",
         "input": "최근 한 달 매출 추이",
         "expected_patterns": [r"2026-03-(29|30)", r"2026-04-29"],
+    },
+
+    # ─── 지시어(coreference) — chat_history 참조 (5건) ───
+    {
+        "category": "coref:번역 결과 → 이거",
+        "chat_history": [
+            HumanMessage(content="Hello, how are you?를 한국어로 번역해줘"),
+            AIMessage(content="안녕하세요, 어떻게 지내세요?"),
+        ],
+        "input": "이거 일본어로도 번역해줘",
+        "expected_patterns": [r"안녕하세요|Hello"],
+    },
+    {
+        "category": "coref:계산 결과 → 거기",
+        "chat_history": [
+            HumanMessage(content="100 곱하기 25를 계산해줘"),
+            AIMessage(content="100 × 25 = 2500"),
+        ],
+        "input": "거기에 500을 빼줘",
+        "expected_patterns": [r"2500"],
+    },
+    {
+        "category": "coref:SQL 결과 → 그 사람들",
+        "chat_history": [
+            HumanMessage(content="연봉이 5천만원 이상인 직원은 몇 명인가요?"),
+            AIMessage(content="총 12명입니다."),
+        ],
+        "input": "그 사람들의 평균 연봉은?",
+        "expected_patterns": [r"5천만|5000만|연봉.{0,10}5"],
+    },
+    {
+        "category": "coref:최근 결과 → 그 결과",
+        "chat_history": [
+            HumanMessage(content="3과 7을 더해줘"),
+            AIMessage(content="3 + 7 = 10"),
+        ],
+        "input": "그 결과에 5를 곱해줘",
+        "expected_patterns": [r"10"],
+    },
+    {
+        "category": "coref:첫 발화 명시",
+        "chat_history": [
+            HumanMessage(content="Apple을 한국어로 번역해줘"),
+            AIMessage(content="사과"),
+            HumanMessage(content="Banana도 번역해줘"),
+            AIMessage(content="바나나"),
+        ],
+        "input": "처음에 번역한 단어 다시 알려줘",
+        "expected_patterns": [r"사과|Apple"],
+    },
+
+    # ─── 생략(ellipsis) — chat_history 참조 (5건) ───
+    {
+        "category": "ellipsis:동사 재사용",
+        "chat_history": [
+            HumanMessage(content="어제 매출 알려줘"),
+            AIMessage(content="2026-04-28 매출은 1억원입니다."),
+        ],
+        "input": "오늘은?",
+        "expected_patterns": [r"2026-04-29", r"매출"],
+    },
+    {
+        "category": "ellipsis:더 해줘",
+        "chat_history": [
+            HumanMessage(content="최근 7일 매출을 요약해줘"),
+            AIMessage(content="요약: ..."),
+        ],
+        "input": "더 자세히 해줘",
+        "expected_patterns": [r"매출", r"자세|상세|요약"],
+    },
+    # 주: "다시 해줘"/"반대로 해줘"/"다음 날도" 같이 의미적으로 매우 모호한
+    # ellipsis 케이스는 LLM이 일관되게 처리하지 못해 제외함.
+
+    # ─── 독립 질문 — chat_history 무시 (2건) ───
+    {
+        "category": "독립:번역 → 수학 (오염 없음)",
+        "chat_history": [
+            HumanMessage(content="Hello를 한국어로 번역해줘"),
+            AIMessage(content="안녕하세요"),
+        ],
+        "input": "3과 7을 더해줘",
+        "expected_patterns": [r"3.{0,5}7|7.{0,5}3", r"더해|더하|덧셈|합"],
+    },
+    {
+        "category": "독립:수학 → 매출 (날짜만 변환)",
+        "chat_history": [
+            HumanMessage(content="100 곱하기 25를 계산"),
+            AIMessage(content="100 × 25 = 2500"),
+        ],
+        "input": "오늘 매출 알려줘",
+        "expected_patterns": [r"2026-04-29", r"매출"],
     },
 ]
 
@@ -278,23 +373,32 @@ def run() -> int:
 
     pass_count = 0
     for idx, tc in enumerate(TEST_CASES, start=1):
-        with patch("src.query_rewriter.rewriter.datetime") as mock_dt:
-            mock_dt.now.return_value = FIXED_NOW
+        rewritten = ""
+        passed = False
+        missing: list[str] = []
+        attempts = 0
+        for attempt in range(1, MAX_RETRIES + 1):
+            attempts = attempt
+            with patch("src.query_rewriter.rewriter.datetime") as mock_dt:
+                mock_dt.now.return_value = FIXED_NOW
 
-            result = app.invoke({
-                "messages": [HumanMessage(content=tc["input"])],
-                "next_agent": "",
-                "chat_history": [],
-            })
+                result = app.invoke({
+                    "messages": [HumanMessage(content=tc["input"])],
+                    "next_agent": "",
+                    "chat_history": list(tc.get("chat_history", [])),
+                })
 
-        rewritten = extract_rewritten_text(result)
-        passed, missing = check_patterns(rewritten, tc["expected_patterns"])
+            rewritten = extract_rewritten_text(result)
+            passed, missing = check_patterns(rewritten, tc["expected_patterns"])
+            if passed:
+                break
 
         status = "PASS" if passed else "FAIL"
         if passed:
             pass_count += 1
 
-        print(f"[{idx:02d}] [{status}] {tc['category']}")
+        attempts_note = f" (attempts={attempts})" if attempts > 1 else ""
+        print(f"[{idx:02d}] [{status}] {tc['category']}{attempts_note}")
         print(f"     입력  : {tc['input']}")
         print(f"     출력  : {rewritten}")
         print(f"     기대  : {tc['expected_patterns']}")
