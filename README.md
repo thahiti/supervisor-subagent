@@ -21,7 +21,8 @@ LangGraph 기반의 멀티 에이전트 시스템. Router가 사용자 요청을
 ```bash
 cp .env.example .env              # OPENAI_API_KEY 설정
 uv sync                           # 의존성 설치
-uv run python -m src.main         # 데모 실행 (시나리오 A~E)
+uv run python -m src.cli          # 인터랙티브 CLI 실행 (멀티턴 + 추천)
+uv run python -m src.main         # 5개 데모 시나리오 일괄 실행
 uv run python -m evals.run        # LLM-as-Judge 평가 실행
 ```
 
@@ -91,6 +92,35 @@ supervisor-subagent/
   3. `busy_timeout` / query timeout — 무한 대기 방지
 - **자동 시드** — DB 파일이 없으면 `res/sample_db/seed.py`로 ecommerce 샘플(직원/부서/고객/제품/주문)을 즉시 생성한다.
 
+## Interactive CLI
+
+`python -m src.cli`로 멀티턴 대화 REPL을 실행한다.
+
+- **추천 질문 자동 제안** — 시작 시 카테고리별 미리보기를 표시하고, 입력 중 fuzzy 매칭으로 후보를 메뉴에 노출한다. ↑/↓ 또는 Tab으로 채워넣고 편집 후 Enter로 전송.
+- **노드 이벤트 스트리밍** — 그래프의 각 노드가 끝날 때마다 한 줄씩 진행 상황을 출력한다.
+- **멀티턴 컨텍스트** — `chat_history`가 자동 누적되어 "이거 다시 영어로" 같은 후속 지시어를 해석할 수 있다.
+
+### 슬래시 명령
+
+| 명령 | 동작 |
+|------|------|
+| `/exit`, `/quit` | 세션 종료 |
+| `/reset` | `chat_history` 초기화 |
+| `/list` | 모든 카테고리의 추천 질문 출력 |
+| `/list <agent>` | 특정 카테고리만 출력 |
+| `/help` | 명령 일람 |
+
+### 추천 질문 추가
+
+`res/suggestions.yaml`의 카테고리별 리스트에 항목을 추가한다. 카테고리 키는 `registry.agent_names`(예: `math`, `translate`, `sql`)와 일치시키면 된다. 미스매치 키는 WARNING 로그만 남기고 그대로 사용된다.
+
+### 옵션
+
+```bash
+uv run python -m src.cli --verbose                 # INFO 로그 노출
+uv run python -m src.cli --suggestions path.yaml   # 다른 추천 파일 사용
+```
+
 ## Documentation
 
 | 문서 | 내용 |
@@ -109,5 +139,6 @@ supervisor-subagent/
 - `langchain-core` — 메시지, 도구 등 핵심 추상화
 - `python-dotenv` — 환경 변수 관리
 - `pyyaml` — 평가 테스트 케이스 YAML 파싱
+- `prompt_toolkit` — 인터랙티브 CLI 입력, fuzzy 자동완성
 
 요구 Python: `>=3.11`
