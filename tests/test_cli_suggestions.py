@@ -50,3 +50,19 @@ def test_flatten_preserves_order_and_meta() -> None:
     flat, meta = flatten(src)
     assert flat == ["a", "b", "c"]
     assert meta == {"a": "math", "b": "math", "c": "translate"}
+
+
+def test_load_suggestions_skips_non_list_category(tmp_path: Path, caplog) -> None:
+    f = tmp_path / "mixed.yaml"
+    f.write_text(
+        "math:\n"
+        "  - \"3+5\"\n"
+        "broken: not_a_list\n",
+        encoding="utf-8",
+    )
+
+    with caplog.at_level("WARNING", logger="supervisor_subagent.cli.suggestions"):
+        result = load_suggestions(f)
+
+    assert result == {"math": ["3+5"]}
+    assert any("broken" in rec.message for rec in caplog.records)

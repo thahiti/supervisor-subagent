@@ -44,6 +44,10 @@ def flatten(suggestions: dict[str, list[str]]) -> tuple[list[str], dict[str, str
     """평면 리스트와 {질문: 카테고리} 메타 dict를 반환한다.
 
     카테고리 등록 순서, 카테고리 내부 순서를 모두 보존한다.
+
+    주의: 같은 질문 텍스트가 여러 카테고리에 등장하면 meta dict에는
+    마지막 카테고리만 남는다. 추천 질문 텍스트는 카테고리 전반에서
+    고유하게 유지하는 것을 권장한다.
     """
     flat: list[str] = []
     meta: dict[str, str] = {}
