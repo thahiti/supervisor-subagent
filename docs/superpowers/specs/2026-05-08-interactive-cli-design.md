@@ -253,7 +253,7 @@ while True:
 |--------|------|
 | `/exit`, `/quit` | 정상 종료 |
 | EOF (Ctrl+D) | 정상 종료 |
-| Ctrl+C, 프롬프트 대기 중 | 종료 |
+| Ctrl+C, 프롬프트 대기 중 | 입력 취소 후 프롬프트 재출력 (루프 유지) |
 | Ctrl+C, turn 실행 중 | 현재 turn 중단, 프롬프트 복귀, chat_history는 유지 |
 
 prompt_toolkit의 `KeyboardInterrupt` / `EOFError` 처리 패턴을 그대로 사용한다.

@@ -42,6 +42,7 @@ supervisor-subagent/
 │   ├── state.py                  # 공유 State / WorkerState 정의
 │   ├── registry.py               # 에이전트 레지스트리 (글로벌 인스턴스)
 │   ├── llm.py                    # ChatOpenAI 팩토리 (모델 중앙화)
+│   ├── cli/                      # 인터랙티브 REPL (멀티턴 + 추천 + 스트리밍)
 │   ├── query_rewriter/           # 쿼리 전처리 (시간/맥락/용어)
 │   ├── router/                   # 단발성 라우팅 노드
 │   ├── response_generator/       # 페르소나 기반 최종 답변
@@ -55,6 +56,7 @@ supervisor-subagent/
 ├── evals/                        # LLM-as-Judge 평가 시스템
 ├── res/
 │   ├── test_cases.yaml           # 평가 테스트 케이스
+│   ├── suggestions.yaml          # 인터랙티브 CLI 추천 질문 (카테고리=에이전트명)
 │   └── sample_db/                # ecommerce 샘플 DB (스키마 + 시드)
 ├── tests/                        # 단위 테스트 (pytest)
 ├── scripts/                      # 스모크 테스트 등 보조 스크립트
