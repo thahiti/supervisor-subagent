@@ -15,7 +15,7 @@ from langchain_core.messages import AIMessage, SystemMessage
 from src.registry import registry
 from src.llm import get_chat_model
 from src.logging import get_logger, log_node
-from src.sql_agent.tools import _executor  # 모듈 레벨 SqlExecutor 인스턴스 재활용
+from src.sql_agent.tools import get_executor  # 모듈 레벨 SqlExecutor 인스턴스 재활용 (set_executor 교체 반영)
 from src.state import State
 from src.templated_sql_agent import templates  # noqa: F401 - 등록 트리거
 from src.templated_sql_agent.prompt import build_system_prompt
@@ -71,7 +71,7 @@ def _run_main(template: SqlTemplate, extracted: dict[str, Any]) -> str:
             f"다음 변수가 잘못되었거나 누락되었습니다: {exc}\n"
             "값을 확인해 다시 알려주세요."
         )
-    result = _executor.execute(sql, params)
+    result = get_executor().execute(sql, params)
     return result["markdown"]
 
 
@@ -97,7 +97,7 @@ def _run_lookups(
     blocks: list[str] = []
     for v in candidates:
         assert v.lookup_sql is not None
-        r = _executor.execute(v.lookup_sql)
+        r = get_executor().execute(v.lookup_sql)
         header = f"[{v.description} 후보값]"
         if r["ok"]:
             blocks.append(f"{header}\n{r['markdown']}")

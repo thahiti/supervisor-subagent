@@ -135,13 +135,14 @@ class TestAgentDispatch:
 
 
 class TestExecuteMain:
-    @patch("src.templated_sql_agent.agent._executor")
+    @patch("src.templated_sql_agent.agent.get_executor")
     @patch("src.templated_sql_agent.agent.get_chat_model")
     def test_execute_main_calls_executor_with_named_params(
         self,
         mock_get_model: MagicMock,
-        mock_executor: MagicMock,
+        mock_get_executor: MagicMock,
     ) -> None:
+        mock_executor = mock_get_executor.return_value
         mock_get_model.return_value = _llm_returning({
             "action": "execute_main",
             "template_id": "product_stock",
@@ -162,13 +163,14 @@ class TestExecuteMain:
         assert params_arg == {"product_id": 7}
         assert "| 7 |" in result["messages"][-1].content
 
-    @patch("src.templated_sql_agent.agent._executor")
+    @patch("src.templated_sql_agent.agent.get_executor")
     @patch("src.templated_sql_agent.agent.get_chat_model")
     def test_execute_main_render_error_reports_to_user(
         self,
         mock_get_model: MagicMock,
-        mock_executor: MagicMock,
+        mock_get_executor: MagicMock,
     ) -> None:
+        mock_executor = mock_get_executor.return_value
         mock_get_model.return_value = _llm_returning({
             "action": "execute_main",
             "template_id": "product_stock",
@@ -183,13 +185,14 @@ class TestExecuteMain:
 
 
 class TestExecuteLookup:
-    @patch("src.templated_sql_agent.agent._executor")
+    @patch("src.templated_sql_agent.agent.get_executor")
     @patch("src.templated_sql_agent.agent.get_chat_model")
     def test_execute_lookup_runs_lookup_sql(
         self,
         mock_get_model: MagicMock,
-        mock_executor: MagicMock,
+        mock_get_executor: MagicMock,
     ) -> None:
+        mock_executor = mock_get_executor.return_value
         mock_get_model.return_value = _llm_returning({
             "action": "execute_lookup",
             "template_id": "product_stock",
@@ -216,13 +219,14 @@ class TestExecuteLookup:
         content = result["messages"][-1].content
         assert "| name |" in content or "| id |" in content
 
-    @patch("src.templated_sql_agent.agent._executor")
+    @patch("src.templated_sql_agent.agent.get_executor")
     @patch("src.templated_sql_agent.agent.get_chat_model")
     def test_execute_lookup_skips_vars_without_lookup_sql(
         self,
         mock_get_model: MagicMock,
-        mock_executor: MagicMock,
+        mock_get_executor: MagicMock,
     ) -> None:
+        mock_executor = mock_get_executor.return_value
         # category_top_n_revenue의 n은 lookup_sql=None이다.
         mock_get_model.return_value = _llm_returning({
             "action": "execute_lookup",
@@ -243,13 +247,14 @@ class TestExecuteLookup:
         called_sql = mock_executor.execute.call_args[0][0]
         assert "DISTINCT category" in called_sql
 
-    @patch("src.templated_sql_agent.agent._executor")
+    @patch("src.templated_sql_agent.agent.get_executor")
     @patch("src.templated_sql_agent.agent.get_chat_model")
     def test_execute_lookup_when_no_lookup_available(
         self,
         mock_get_model: MagicMock,
-        mock_executor: MagicMock,
+        mock_get_executor: MagicMock,
     ) -> None:
+        mock_executor = mock_get_executor.return_value
         mock_get_model.return_value = _llm_returning({
             "action": "execute_lookup",
             "template_id": "monthly_order_count",
