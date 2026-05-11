@@ -121,6 +121,40 @@ def run_multiturn_scenario(
     )
 
 
+def run_three_turn_scenario(
+    app,
+    name: str,
+    description: str,
+    turn1: str,
+    turn2: str,
+    turn3: str,
+) -> None:
+    """3턴 멀티턴 시나리오. chat_history를 누적해 다음 invoke에 인계."""
+    logger.info("시나리오 %s: %s", name, description)
+    chat_history: list = []
+
+    for i, msg in enumerate((turn1, turn2, turn3), start=1):
+        logger.info("%d차 입력: %s", i, msg)
+        result = app.invoke({
+            "messages": [HumanMessage(content=msg)],
+            "next_agent": "",
+            "chat_history": chat_history,
+        })
+        chat_history = result.get("chat_history", chat_history)
+        logger.info("%d차 종료 후 chat_history 길이: %d", i, len(chat_history))
+
+        logger.info(
+            "\n%s\n"
+            "  [SCENARIO %s · turn %d] Finished\n"
+            "%s\n"
+            "  Final State:\n%s\n"
+            "%s",
+            "=" * 60, name, i, "=" * 60,
+            format_state_pretty(result),
+            "=" * 60,
+        )
+
+
 def main():
     setup_logging()
     logger.info("Router-Subagent 패턴 데모 시작")
@@ -151,6 +185,14 @@ def main():
         app, "E", "멀티턴 — 1차 결과를 chat_history로 인계해 2차 맥락 보충",
         "Hello, how are you?를 한국어로 번역해주세요",
         "이거 다시 영어로 번역해주세요",
+    )
+
+    run_three_turn_scenario(
+        app, "F",
+        "templated_sql 멀티턴 — 변수 부족 → 후보값 조회 → 실행",
+        "상품 재고 알려줘",
+        "응 보여줘",
+        "상품 id 5번 재고 알려줘",
     )
 
 
