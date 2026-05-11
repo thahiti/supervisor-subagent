@@ -68,11 +68,17 @@ class SqlExecutor:
     def db_path(self) -> Path:
         return self._db_path
 
-    def execute(self, query: str) -> ExecutionResult:
+    def execute(
+        self,
+        query: str,
+        params: dict[str, Any] | None = None,
+    ) -> ExecutionResult:
         """쿼리를 검증하고 실행하여 결과를 반환한다.
 
         Args:
-            query: 실행할 SQL 쿼리 문자열.
+            query: 실행할 SQL 쿼리 문자열. params를 사용하는 경우 :name 형식
+                named placeholder를 사용한다.
+            params: sqlite3 named-parameter 바인딩 dict. None이면 미바인딩 실행.
 
         Returns:
             ExecutionResult. 실패 시 ok=False와 error 메시지를 포함한다.
@@ -84,7 +90,7 @@ class SqlExecutor:
             return _error_result(str(exc))
 
         safe_query = inject_limit_if_missing(query, self._row_limit)
-        return self._run_query(safe_query)
+        return self._run_query(safe_query, params)
 
     def list_tables(self) -> ExecutionResult:
         """DB 내 사용자 테이블 목록을 반환한다.
@@ -136,10 +142,14 @@ class SqlExecutor:
         finally:
             conn.close()
 
-    def _run_query(self, query: str) -> ExecutionResult:
+    def _run_query(
+        self,
+        query: str,
+        params: dict[str, Any] | None = None,
+    ) -> ExecutionResult:
         try:
             with self._connect() as conn:
-                cursor = conn.execute(query)
+                cursor = conn.execute(query, params or {})
                 rows = cursor.fetchall()
                 columns = [d[0] for d in cursor.description] if cursor.description else []
         except sqlite3.Error as exc:

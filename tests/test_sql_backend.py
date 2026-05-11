@@ -152,6 +152,33 @@ class TestExecute:
         assert r["ok"]
         assert "0개 행" in r["markdown"]
 
+    def test_execute_with_named_params(self, executor: SqlExecutor) -> None:
+        r = executor.execute(
+            "SELECT name FROM items WHERE id = :id",
+            {"id": 2},
+        )
+        assert r["ok"]
+        assert [row[0] for row in r["rows"]] == ["banana"]
+
+    def test_execute_with_params_none_behaves_like_before(
+        self, executor: SqlExecutor,
+    ) -> None:
+        r = executor.execute("SELECT name FROM items ORDER BY id")
+        assert r["ok"]
+        assert [row[0] for row in r["rows"]] == ["apple", "banana", "cherry"]
+
+    def test_execute_with_params_isolates_injection(
+        self, executor: SqlExecutor,
+    ) -> None:
+        # SQL 문자열 안에 직접 박지 않고 바인딩으로 전달하므로 인젝션 패턴이
+        # 데이터 값으로만 취급된다.
+        r = executor.execute(
+            "SELECT name FROM items WHERE name = :n",
+            {"n": "'; DROP TABLE items; --"},
+        )
+        assert r["ok"]
+        assert r["rows"] == []
+
 
 class TestInspection:
     def test_list_tables(self, executor: SqlExecutor) -> None:
