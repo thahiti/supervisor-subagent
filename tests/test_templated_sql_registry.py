@@ -136,3 +136,67 @@ class TestRegistrationValidation:
             reg.register(bad)
         assert reg.get("bad") is None
         assert reg.templates == []
+
+
+class TestBuilders:
+    def _populated(self) -> TemplateRegistry:
+        reg = TemplateRegistry()
+        reg.register(SqlTemplate(
+            id="t1",
+            intent="첫 번째 의도",
+            sql="SELECT * FROM t WHERE x = :x",
+            variables=(
+                TemplateVariable(
+                    name="x",
+                    description="x 설명",
+                    sql_type="int",
+                    lookup_sql="SELECT id, name FROM t ORDER BY name",
+                ),
+            ),
+        ))
+        reg.register(SqlTemplate(
+            id="t2",
+            intent="두 번째 의도",
+            sql="SELECT * FROM t WHERE y = :y",
+            variables=(
+                TemplateVariable(
+                    name="y",
+                    description="y 설명",
+                    sql_type="text",
+                ),
+            ),
+        ))
+        return reg
+
+    def test_router_description_contains_header_and_intents(self) -> None:
+        desc = self._populated().build_router_description()
+        assert "사전 정의된 SQL 템플릿" in desc
+        assert "후보값" in desc
+        assert "첫 번째 의도" in desc
+        assert "두 번째 의도" in desc
+
+    def test_router_description_empty_registry(self) -> None:
+        desc = TemplateRegistry().build_router_description()
+        # 빈 레지스트리여도 헤더는 있고 의도 항목만 비어 있다.
+        assert "사전 정의된 SQL 템플릿" in desc
+
+    def test_catalog_for_llm_includes_template_id_and_variables(self) -> None:
+        cat = self._populated().build_catalog_for_llm()
+        assert "template_id: t1" in cat
+        assert "template_id: t2" in cat
+        assert "x (int)" in cat
+        assert "y (text)" in cat
+        assert "x 설명" in cat
+        assert "y 설명" in cat
+
+    def test_catalog_indicates_lookup_availability(self) -> None:
+        cat = self._populated().build_catalog_for_llm()
+        # x는 lookup_sql이 있고, y는 없다.
+        assert "후보값 조회 가능" in cat
+        assert "후보값 조회 불가" in cat
+
+    def test_catalog_does_not_leak_lookup_sql_body(self) -> None:
+        """lookup_sql 본문은 LLM에 노출되지 않아야 한다."""
+        cat = self._populated().build_catalog_for_llm()
+        assert "ORDER BY name" not in cat
+        assert "SELECT id, name FROM t" not in cat
