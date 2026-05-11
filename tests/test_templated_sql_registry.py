@@ -50,3 +50,89 @@ class TestBasicRegistration:
         got = reg.templates
         got.clear()
         assert [t.id for t in reg.templates] == ["a"]
+
+
+class TestRegistrationValidation:
+    def test_rejects_duplicate_id(self) -> None:
+        reg = TemplateRegistry()
+        reg.register(_make_template("dup"))
+        with pytest.raises(ValueError, match="중복"):
+            reg.register(_make_template("dup"))
+
+    def test_rejects_placeholder_mismatch_missing_var(self) -> None:
+        reg = TemplateRegistry()
+        bad = SqlTemplate(
+            id="bad",
+            intent="i",
+            sql="SELECT * FROM t WHERE x = :x AND y = :y",
+            variables=(
+                TemplateVariable(name="x", description="d", sql_type="int"),
+            ),
+        )
+        with pytest.raises(ValueError, match="placeholder"):
+            reg.register(bad)
+
+    def test_rejects_placeholder_mismatch_extra_var(self) -> None:
+        reg = TemplateRegistry()
+        bad = SqlTemplate(
+            id="bad",
+            intent="i",
+            sql="SELECT * FROM t WHERE x = :x",
+            variables=(
+                TemplateVariable(name="x", description="d", sql_type="int"),
+                TemplateVariable(name="y", description="d", sql_type="int"),
+            ),
+        )
+        with pytest.raises(ValueError, match="placeholder"):
+            reg.register(bad)
+
+    def test_rejects_non_select_lookup_sql(self) -> None:
+        reg = TemplateRegistry()
+        bad = SqlTemplate(
+            id="bad",
+            intent="i",
+            sql="SELECT * FROM t WHERE x = :x",
+            variables=(
+                TemplateVariable(
+                    name="x",
+                    description="d",
+                    sql_type="int",
+                    lookup_sql="DELETE FROM t",
+                ),
+            ),
+        )
+        with pytest.raises(ValueError, match="SELECT"):
+            reg.register(bad)
+
+    def test_accepts_select_lookup_sql(self) -> None:
+        reg = TemplateRegistry()
+        ok = SqlTemplate(
+            id="ok",
+            intent="i",
+            sql="SELECT * FROM t WHERE x = :x",
+            variables=(
+                TemplateVariable(
+                    name="x",
+                    description="d",
+                    sql_type="int",
+                    lookup_sql="SELECT id, name FROM t ORDER BY name",
+                ),
+            ),
+        )
+        reg.register(ok)
+        assert reg.get("ok") is ok
+
+    def test_validation_failure_does_not_register(self) -> None:
+        reg = TemplateRegistry()
+        bad = SqlTemplate(
+            id="bad",
+            intent="i",
+            sql="SELECT * FROM t WHERE x = :x AND y = :y",
+            variables=(
+                TemplateVariable(name="x", description="d", sql_type="int"),
+            ),
+        )
+        with pytest.raises(ValueError):
+            reg.register(bad)
+        assert reg.get("bad") is None
+        assert reg.templates == []
