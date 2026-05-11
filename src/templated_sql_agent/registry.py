@@ -99,5 +99,47 @@ class TemplateRegistry:
         """id로 템플릿을 조회. 없으면 None."""
         return self._by_id.get(template_id)
 
+    def build_router_description(self) -> str:
+        """라우터 description으로 사용할 문자열을 합성한다.
+
+        헤더 + 등록된 모든 템플릿의 intent 불릿 리스트.
+        """
+        header = (
+            "사전 정의된 SQL 템플릿 기반의 데이터 조회를 처리합니다. 각 조회에 "
+            "필요한 변수의 후보값을 사용자에게 안내하고, 사용자 동의 시 후보값을 "
+            "조회해 표로 제시하는 흐름도 이 에이전트가 처리합니다."
+        )
+        if not self._templates:
+            return header
+
+        lines = [header, "다음 종류의 질의를 다룹니다:"]
+        for t in self._templates:
+            lines.append(f"- {t.intent}")
+        return "\n".join(lines)
+
+    def build_catalog_for_llm(self) -> str:
+        """templated_sql 에이전트 LLM 시스템 프롬프트의 템플릿 카탈로그 섹션.
+
+        각 템플릿의 id/intent/변수 스키마(name, sql_type, description,
+        lookup 가능 여부)를 포함한다. lookup_sql 본문은 노출하지 않는다.
+        """
+        if not self._templates:
+            return "(등록된 템플릿 없음)"
+
+        blocks: list[str] = []
+        for t in self._templates:
+            lines = [
+                f"### template_id: {t.id}",
+                f"의도: {t.intent}",
+                "변수:",
+            ]
+            for v in t.variables:
+                lookup_tag = "후보값 조회 가능" if v.lookup_sql else "후보값 조회 불가"
+                lines.append(
+                    f"- {v.name} ({v.sql_type}): {v.description}. {lookup_tag}."
+                )
+            blocks.append("\n".join(lines))
+        return "\n\n".join(blocks)
+
 
 template_registry = TemplateRegistry()
