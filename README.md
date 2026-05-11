@@ -5,15 +5,16 @@ LangGraph 기반의 멀티 에이전트 시스템. Router가 사용자 요청을
 ## Architecture
 
 ```
-[START] → [query_rewriter] → [router] ─┬→ [math_agent]      ─┐
-                                       ├→ [translate_agent]  ├→ [response_generator] → [END]
-                                       ├→ [sql_agent]        ┘
+[START] → [query_rewriter] → [router] ─┬→ [math_agent]          ─┐
+                                       ├→ [translate_agent]      │
+                                       ├→ [sql_agent]            ├→ [response_generator] → [END]
+                                       ├→ [templated_sql_agent]  │
                                        └→ [response_generator] (FINISH)
 ```
 
 - **query_rewriter** — 사용자 쿼리에 시간 표현 해석(예: "지난주" → `2026-04-27~2026-05-03`), 대화 맥락 보충, 용어 사전 치환을 적용해 명확한 형태로 재작성한다.
 - **router** — 단발성 라우팅. 사용자 요청을 분석해 가장 적합한 워커 하나만 선택하고, 적합한 워커가 없으면 `FINISH`로 곧바로 답변 생성 단계로 넘긴다.
-- **subagents** — `math`, `translate`, `sql` 중 선택된 하나만 실행된다.
+- **subagents** — `math`, `translate`, `sql`, `templated_sql` 중 선택된 하나만 실행된다.
 - **response_generator** — 서브에이전트 결과를 페르소나에 맞춰 최종 답변으로 정리하고, 멀티턴 컨텍스트를 위해 `chat_history`에 한 턴(리라이팅된 사용자 질의 + 최종 출력)을 누적한다.
 
 ## Quick Start
@@ -32,6 +33,7 @@ uv run python -m evals.run        # LLM-as-Judge 평가 실행
 - **C** 복합 요청 — router가 주된 의도 하나만 선택
 - **D** SQL 조회 (sql) — `res/sample_db/ecommerce.db` 자동 시드
 - **E** 멀티턴 — 1차 응답을 `chat_history`로 인계해 "이거 다시 영어로" 같은 지시어 해석 검증
+- **F** templated_sql 멀티턴 — 변수 부족 → 후보값 조회 → 실행의 3턴 시연
 
 ## Project Structure
 
@@ -52,6 +54,12 @@ supervisor-subagent/
 │   ├── sql_agent/                # Text-to-SQL ReAct 에이전트
 │   │   ├── frontend/             #   도메인 인식 레이어 (스키마 + few-shot)
 │   │   └── backend/              #   도메인 무지 SQLite 실행기 (read-only)
+│   ├── templated_sql_agent/       # 사전 정의 SQL 템플릿 기반 조회
+│   │   ├── registry.py            #   SqlTemplate / TemplateRegistry
+│   │   ├── templates.py           #   ecommerce 도메인 5개 템플릿 등록
+│   │   ├── render.py              #   변수 검증 + named-param 바인딩
+│   │   ├── prompt.py              #   action 분류용 시스템 프롬프트
+│   │   └── agent.py               #   wrapper + 4-action 분기
 │   └── logging/                  # @log_node 데코레이터 + git diff 스타일 출력
 ├── evals/                        # LLM-as-Judge 평가 시스템
 ├── res/
@@ -80,6 +88,7 @@ supervisor-subagent/
 | `math` | ReAct | `add`, `multiply`, `divide` |
 | `translate` | LLM 직접 호출 | 한↔영 번역 |
 | `sql` | ReAct (frontend/backend 분리) | `execute_sql`, `list_tables`, `get_schema` (read-only SQLite) |
+| `templated_sql` | LLM 직접 호출 + 분기 | 정적 등록 `SqlTemplate` 카탈로그, lookup_sql, `SqlExecutor` 재활용 |
 
 새 에이전트 추가는 wrapper 함수에 `@registry.agent("name")` 데코레이터 한 줄과 docstring만으로 끝난다 — 그래프 빌드 코드, 라우터 프롬프트, 라우터 분기 모두 자동으로 반영된다. 자세한 메커니즘은 [AgentRegistry.md](./AgentRegistry.md) 참조.
 
