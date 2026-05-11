@@ -6,8 +6,11 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Literal
+
+from src.sql_agent.backend.safety import UnsafeSqlError, validate_select_only
 
 
 @dataclass(frozen=True)
@@ -56,7 +59,34 @@ class TemplateRegistry:
         self._by_id: dict[str, SqlTemplate] = {}
 
     def register(self, template: SqlTemplate) -> None:
-        """템플릿을 레지스트리에 등록한다."""
+        """템플릿을 레지스트리에 등록한다.
+
+        검증 실패 시 ValueError를 즉시 발생시킨다. 검증 항목:
+            1. id 중복 금지
+            2. sql의 :name placeholder 집합과 variables의 name 집합이 정확히 일치
+            3. 각 lookup_sql은 SELECT-only (백엔드 safety 재활용)
+        """
+        if template.id in self._by_id:
+            raise ValueError(f"중복 템플릿 id: {template.id}")
+
+        placeholders = set(re.findall(r":(\w+)", template.sql))
+        var_names = {v.name for v in template.variables}
+        if placeholders != var_names:
+            raise ValueError(
+                f"템플릿 '{template.id}': sql placeholder {sorted(placeholders)} "
+                f"≠ variables {sorted(var_names)}"
+            )
+
+        for v in template.variables:
+            if v.lookup_sql is not None:
+                try:
+                    validate_select_only(v.lookup_sql)
+                except UnsafeSqlError as exc:
+                    raise ValueError(
+                        f"템플릿 '{template.id}' 변수 '{v.name}'의 lookup_sql은 "
+                        f"SELECT-only여야 합니다: {exc}"
+                    ) from exc
+
         self._templates.append(template)
         self._by_id[template.id] = template
 
