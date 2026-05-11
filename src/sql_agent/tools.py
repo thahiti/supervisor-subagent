@@ -23,6 +23,12 @@ def set_executor(executor: SqlExecutor) -> None:
     _executor = executor
 
 
+def get_executor() -> SqlExecutor:
+    """모듈 레벨 SqlExecutor 인스턴스를 반환한다. set_executor로 교체된 경우
+    교체본을 반환하므로, 다른 에이전트도 동일 인스턴스를 공유한다."""
+    return _executor
+
+
 @tool
 def execute_sql(query: str) -> str:
     """SELECT 쿼리를 실행하고 결과를 Markdown 표로 반환한다.
