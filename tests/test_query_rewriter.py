@@ -159,3 +159,12 @@ class TestQueryRewriterNode:
         assert call_args[1].content == "과거 질의"
         assert call_args[2].content == "과거 출력"
         assert call_args[3].content == "현재 질의"
+
+
+class TestPromptConfirmationRule:
+    def test_prompt_includes_confirmation_response_rule(self) -> None:
+        prompt = build_rewriter_system_prompt(datetime(2026, 5, 11, 9, 0))
+        # 확인 응답 처리 룰이 명시되어야 한다.
+        assert "확인 응답" in prompt or "응" in prompt
+        # 직전 제안의 구체 행동으로 풀어쓴다는 의미가 포함되어야 한다.
+        assert "구체" in prompt or "풀어" in prompt or "명시" in prompt
