@@ -168,3 +168,26 @@ class TestPromptConfirmationRule:
         assert "확인 응답" in prompt or "응" in prompt
         # 직전 제안의 구체 행동으로 풀어쓴다는 의미가 포함되어야 한다.
         assert "구체" in prompt or "풀어" in prompt or "명시" in prompt
+
+
+class TestPromptUserPersona:
+    def test_prompt_forbids_response_tone(self) -> None:
+        prompt = build_rewriter_system_prompt(datetime(2026, 5, 13, 9, 0))
+        # 응답자 어투 금지 어휘가 명시되어야 한다.
+        assert "안내드립니다" in prompt
+        # 금지의 의미가 명시되어야 한다.
+        assert "사용하지" in prompt or "사용하면 안" in prompt or "금지" in prompt
+
+    def test_prompt_includes_short_fragment_rule(self) -> None:
+        prompt = build_rewriter_system_prompt(datetime(2026, 5, 13, 9, 0))
+        # 명사구 단답 처리 규칙이 명시되어야 한다.
+        assert "명사구 단답" in prompt or "단답" in prompt
+        # 대표 예시가 들어 있어야 한다.
+        assert "고객지원" in prompt or "엔지니어링" in prompt
+
+    def test_prompt_includes_user_persona_constraint(self) -> None:
+        prompt = build_rewriter_system_prompt(datetime(2026, 5, 13, 9, 0))
+        # 사용자 입장 페르소나 제약이 명시되어야 한다.
+        assert "사용자가 에이전트에게" in prompt
+        # 질문/요청 형태 강제가 명시되어야 한다.
+        assert "질문" in prompt and "요청" in prompt
