@@ -12,14 +12,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 
 from src.llm import get_chat_model
 from src.query_rewriter.prompt import build_rewriter_system_prompt
 
 
-def rewrite_once(user_query: str, chat_history: list) -> str:
-    """rewriter LLM을 직접 호출해 결과 텍스트만 반환."""
+def rewrite_once(user_query: str, chat_history: list[BaseMessage]) -> str:
+    """rewriter LLM을 1회 호출해 결과 텍스트만 반환한다."""
     system_prompt = build_rewriter_system_prompt(now=datetime.now())
     llm = get_chat_model()
     response = llm.invoke(
@@ -30,7 +30,15 @@ def rewrite_once(user_query: str, chat_history: list) -> str:
     return response.content  # type: ignore[return-value]
 
 
-def run_case(label: str, user_query: str, chat_history: list, n: int = 5) -> None:
+def run_case(label: str, user_query: str, chat_history: list[BaseMessage], n: int = 5) -> None:
+    """rewriter를 N회 호출하고 각 결과를 출력한다.
+
+    Args:
+        label: 케이스 헤더로 출력할 사람이 읽을 수 있는 식별자.
+        user_query: 리라이터에 전달할 사용자 입력.
+        chat_history: 멀티턴 맥락 메시지 리스트 (단발이면 빈 리스트).
+        n: LLM 비결정성 측정을 위한 반복 호출 횟수.
+    """
     print(f"\n===== {label} =====")
     print(f"입력: {user_query!r}")
     if chat_history:
@@ -44,6 +52,12 @@ def run_case(label: str, user_query: str, chat_history: list, n: int = 5) -> Non
 
 
 def main() -> None:
+    """세 가지 회귀 테스트 케이스를 순차 실행한다.
+
+    CASE 1: chat_history 없는 짧은 명사구 단답 (실패 모드 재현).
+    CASE 2: chat_history가 있는 멀티턴 (정상 경로).
+    CASE 3: 평범한 정상 입력 (대조군).
+    """
     # 케이스 1: 단발 짧은 명사 — 응답-형식 출력이 나오는지
     run_case("CASE 1: 단발 '고객지원' (chat_history 없음)", "고객지원", [], n=5)
 
