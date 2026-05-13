@@ -191,3 +191,10 @@ class TestPromptUserPersona:
         assert "사용자가 에이전트에게" in prompt
         # 질문/요청 형태 강제가 명시되어야 한다.
         assert "질문" in prompt and "요청" in prompt
+
+    def test_prompt_forbids_agent_clarification_form(self) -> None:
+        prompt = build_rewriter_system_prompt(datetime(2026, 5, 13, 9, 0))
+        # 리라이터가 사용자에게 되묻는 형식 금지가 명시되어야 한다.
+        assert "되묻" in prompt
+        # 명확화 책임이 다운스트림에 있음을 명시해야 한다.
+        assert "명확화" in prompt or "다운스트림" in prompt
