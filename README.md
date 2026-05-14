@@ -72,8 +72,9 @@ supervisor-subagent/
 ├── res/
 │   ├── test_cases.yaml           # 평가 테스트 케이스
 │   ├── suggestions.yaml          # 인터랙티브 CLI 추천 질문 (카테고리=에이전트명)
-│   ├── sample_db/                # ecommerce 샘플 DB (스키마 + 시드)
-│   └── sample_db/factory/    # 제조업 메타DB + 3개 브랜치 DB 시드 (tool_call용)
+│   └── sample_db/                # 샘플 DB
+│       ├── (ecommerce.db ...)    #   ecommerce 샘플 (sql/templated_sql용, 스키마 + 시드)
+│       └── factory/              #   제조업 메타DB + 3개 브랜치 DB (tool_call용)
 ├── tests/                        # 단위 테스트 (pytest)
 ├── scripts/                      # 스모크 테스트 등 보조 스크립트
 └── docs/superpowers/             # 설계 문서 (specs, plans)
