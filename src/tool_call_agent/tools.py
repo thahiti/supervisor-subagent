@@ -105,3 +105,27 @@ def list_branches() -> str:
     except (sqlite3.Error, UnsafeSqlError) as exc:
         return f"ERROR: 브랜치 목록 조회 실패: {exc}"
     return _to_markdown(cols, rows)
+
+
+@tool
+def get_branch_db_path(branch_code: str) -> str:
+    """특정 브랜치의 머신 DB 경로를 반환한다.
+
+    list_machines / get_machine_status를 호출하기 전에 이 도구로 db_path를
+    확보해야 한다. branch_code는 list_branches 결과의 branch_code 컬럼 값과
+    정확히 일치해야 한다.
+
+    Args:
+        branch_code: 브랜치 코드 (예: "F-A").
+    """
+    try:
+        cols, rows = _read_query(
+            _META_DB,
+            "SELECT db_path FROM branches WHERE branch_code = :code",
+            {"code": branch_code},
+        )
+    except (sqlite3.Error, UnsafeSqlError) as exc:
+        return f"ERROR: 브랜치 DB 경로 조회 실패: {exc}"
+    if not rows:
+        return f"ERROR: 등록되지 않은 branch_code: {branch_code}"
+    return str((_FACTORY_DB_ROOT / rows[0][0]).resolve())
