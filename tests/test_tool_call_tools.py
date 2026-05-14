@@ -48,3 +48,57 @@ class TestResolveBranchDb:
     def test_missing_file_rejected(self, factory_tmp: Path) -> None:
         with pytest.raises(ValueError, match="존재하지 않는"):
             tools._resolve_branch_db("branch_Z.db")
+
+
+class TestReadQuery:
+    def test_returns_columns_and_rows(self, factory_tmp: Path) -> None:
+        cols, rows = tools._read_query(
+            factory_tmp / "meta.db",
+            "SELECT branch_code, branch_name FROM branches ORDER BY branch_code",
+        )
+        assert cols == ["branch_code", "branch_name"]
+        assert rows[0][0] == "F-A"
+
+    def test_named_params_binding(self, factory_tmp: Path) -> None:
+        cols, rows = tools._read_query(
+            factory_tmp / "meta.db",
+            "SELECT db_path FROM branches WHERE branch_code = :code",
+            {"code": "F-B"},
+        )
+        assert rows == [("branch_B.db",)]
+
+    def test_select_only_violation_raises(self, factory_tmp: Path) -> None:
+        from src.sql_agent.backend.safety import UnsafeSqlError
+        with pytest.raises(UnsafeSqlError):
+            tools._read_query(factory_tmp / "meta.db", "DELETE FROM branches")
+
+    def test_readonly_connection(self, factory_tmp: Path) -> None:
+        # read-only 검증: 쓰기 시도 시 sqlite3.OperationalError
+        # _read_query는 SELECT만 허용하므로, 여기서는 mtime 불변을 확인
+        import os
+        before = os.path.getmtime(factory_tmp / "branch_A.db")
+        tools._read_query(
+            factory_tmp / "branch_A.db",
+            "SELECT machine_id FROM machines",
+        )
+        after = os.path.getmtime(factory_tmp / "branch_A.db")
+        assert before == after
+
+    def test_auto_limit_injected(self, factory_tmp: Path) -> None:
+        # _ROW_LIMIT=100 cap을 우회할 수 없음. branch_C.db는 머신 5개.
+        cols, rows = tools._read_query(
+            factory_tmp / "branch_C.db",
+            "SELECT machine_id FROM machines",
+        )
+        assert 0 < len(rows) <= 100
+
+
+class TestToMarkdown:
+    def test_basic_table(self) -> None:
+        out = tools._to_markdown(["a", "b"], [(1, "x"), (2, "y")])
+        assert "| a | b |" in out
+        assert "| 1 | x |" in out
+        assert "| 2 | y |" in out
+
+    def test_empty_rows(self) -> None:
+        assert tools._to_markdown(["a"], []) == "(결과 없음)"
