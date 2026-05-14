@@ -129,3 +129,23 @@ def get_branch_db_path(branch_code: str) -> str:
     if not rows:
         return f"ERROR: 등록되지 않은 branch_code: {branch_code}"
     return str((_FACTORY_DB_ROOT / rows[0][0]).resolve())
+
+
+@tool
+def list_machines(db_path: str) -> str:
+    """특정 브랜치 DB의 머신(설비) 목록을 markdown 표로 반환한다.
+
+    db_path는 get_branch_db_path의 반환값을 그대로 사용한다.
+
+    Args:
+        db_path: 브랜치 DB 파일 경로.
+    """
+    try:
+        db_file = _resolve_branch_db(db_path)
+        cols, rows = _read_query(
+            db_file,
+            "SELECT machine_id, name, line, model FROM machines ORDER BY machine_id",
+        )
+    except (ValueError, sqlite3.Error, UnsafeSqlError) as exc:
+        return f"ERROR: 머신 목록 조회 실패: {exc}"
+    return _to_markdown(cols, rows)
