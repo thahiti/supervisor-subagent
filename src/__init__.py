@@ -3,6 +3,14 @@ from src.math_agent import math_wrapper  # noqa: F401
 from src.registry import registry  # noqa: F401
 from src.sql_agent import sql_wrapper  # noqa: F401
 from src.templated_sql_agent import templated_sql_wrapper  # noqa: F401
+from src.tool_call_agent import tool_call_wrapper  # noqa: F401
 from src.translate_agent import translate_wrapper  # noqa: F401
 
-__all__ = ["math_wrapper", "sql_wrapper", "templated_sql_wrapper", "translate_wrapper", "registry"]
+__all__ = [
+    "math_wrapper",
+    "registry",
+    "sql_wrapper",
+    "templated_sql_wrapper",
+    "tool_call_wrapper",
+    "translate_wrapper",
+]

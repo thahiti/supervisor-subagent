@@ -195,6 +195,14 @@ def main():
         "상품 id 5번 재고 알려줘",
     )
 
+    run_three_turn_scenario(
+        app, "G",
+        "tool_call 멀티턴 — 파라미터 부족 → 브랜치 목록 → 머신 상태 조회",
+        "머신 상태 알려줘",
+        "응 브랜치 목록 보여줘",
+        "아산 1공장의 M-001 상태",
+    )
+
 
 if __name__ == "__main__":
     main()
