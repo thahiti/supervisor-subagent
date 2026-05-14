@@ -25,7 +25,7 @@ cp .env.example .env              # OPENAI_API_KEY 설정
 uv sync                           # 의존성 설치
 uv run python -m src.cli          # 인터랙티브 CLI 실행 (멀티턴 + 추천)
 uv run python -m res.sample_db.factory.seed  # tool_call용 multi DB 시드 (최초 1회)
-uv run python -m src.main         # 5개 데모 시나리오 일괄 실행
+uv run python -m src.main         # 7개 데모 시나리오 일괄 실행
 uv run python -m evals.run        # LLM-as-Judge 평가 실행
 ```
 
