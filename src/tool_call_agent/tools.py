@@ -149,3 +149,31 @@ def list_machines(db_path: str) -> str:
     except (ValueError, sqlite3.Error, UnsafeSqlError) as exc:
         return f"ERROR: 머신 목록 조회 실패: {exc}"
     return _to_markdown(cols, rows)
+
+
+@tool
+def get_machine_status(db_path: str, machine_id: str) -> str:
+    """특정 머신의 현재 상태/가동률을 markdown 표로 반환한다.
+
+    Args:
+        db_path: 브랜치 DB 파일 경로 (get_branch_db_path 결과).
+        machine_id: 머신 id (list_machines 결과의 machine_id 컬럼).
+    """
+    try:
+        db_file = _resolve_branch_db(db_path)
+        cols, rows = _read_query(
+            db_file,
+            "SELECT m.machine_id, m.name, s.state, s.uptime_ratio, s.last_updated "
+            "FROM machines m JOIN machine_status s ON m.machine_id = s.machine_id "
+            "WHERE m.machine_id = :mid",
+            {"mid": machine_id},
+        )
+    except (ValueError, sqlite3.Error, UnsafeSqlError) as exc:
+        return f"ERROR: 머신 상태 조회 실패: {exc}"
+    if not rows:
+        return f"ERROR: 머신을 찾을 수 없습니다: {machine_id}"
+    return _to_markdown(cols, rows)
+
+
+TOOLS = [list_branches, get_branch_db_path, list_machines, get_machine_status]
+TOOLS_BY_NAME = {t.name: t for t in TOOLS}
