@@ -109,7 +109,7 @@ def _build_branch_db(path: Path, machines: list[tuple[str, str, str, str]],
 
 
 def run() -> None:
-    """meta.db와 brand DB 3개를 생성/갱신한다. Idempotent."""
+    """meta.db와 branch DB 3개를 생성/갱신한다. Idempotent."""
     _build_meta_db(META_DB_PATH)
     for filename in ("branch_A.db", "branch_B.db", "branch_C.db"):
         _build_branch_db(
