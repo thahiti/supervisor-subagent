@@ -3,3 +3,4 @@ __pycache__/
 *.pyc
 .venv/
 res/sample_db/*.db
+res/sample_db/factory/*.db
