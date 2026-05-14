@@ -126,3 +126,25 @@ class TestGetBranchDbPath:
     def test_unknown_code_returns_error(self, factory_tmp: Path) -> None:
         out = tools.get_branch_db_path.invoke({"branch_code": "F-Z"})
         assert out.startswith("ERROR: 등록되지 않은 branch_code")
+
+
+class TestListMachines:
+    def test_returns_machines_for_branch(self, factory_tmp: Path) -> None:
+        db_path = str((factory_tmp / "branch_A.db").resolve())
+        out = tools.list_machines.invoke({"db_path": db_path})
+        assert "M-001" in out and "압출기 1호" in out
+        assert "| machine_id |" in out
+
+    def test_traversal_path_returns_error(self, factory_tmp: Path) -> None:
+        out = tools.list_machines.invoke({"db_path": "../../etc/passwd"})
+        assert out.startswith("ERROR: 머신 목록 조회 실패")
+        assert "허용되지 않은" in out
+
+    def test_meta_db_rejected(self, factory_tmp: Path) -> None:
+        out = tools.list_machines.invoke({"db_path": "meta.db"})
+        assert out.startswith("ERROR: 머신 목록 조회 실패")
+
+    def test_missing_file_returns_error(self, factory_tmp: Path) -> None:
+        out = tools.list_machines.invoke({"db_path": "branch_Z.db"})
+        assert out.startswith("ERROR: 머신 목록 조회 실패")
+        assert "존재하지 않는" in out
