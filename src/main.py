@@ -6,6 +6,8 @@
 - Math Agent: 수학 계산 tool(add, multiply, divide)을 사용하는 ReAct 에이전트
 - Translate Agent: LLM 직접 호출로 영한 번역을 수행하는 에이전트
 - SQL Agent: ecommerce DB를 자연어로 질의하는 ReAct 에이전트
+- Templated SQL Agent: 사전 정의 템플릿 + 변수로 ecommerce DB를 조회하는 에이전트
+- Tool Call Agent: 제조업 브랜치별 멀티 DB를 함수형 도구 ReAct로 조회하는 에이전트
 
 실행 방법:
     uv run python -m src.main
