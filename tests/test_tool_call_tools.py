@@ -116,3 +116,13 @@ class TestListBranches:
         # 인자 없이 invoke 가능
         out = tools.list_branches.invoke({})
         assert isinstance(out, str)
+
+
+class TestGetBranchDbPath:
+    def test_returns_absolute_path(self, factory_tmp: Path) -> None:
+        out = tools.get_branch_db_path.invoke({"branch_code": "F-A"})
+        assert out == str((factory_tmp / "branch_A.db").resolve())
+
+    def test_unknown_code_returns_error(self, factory_tmp: Path) -> None:
+        out = tools.get_branch_db_path.invoke({"branch_code": "F-Z"})
+        assert out.startswith("ERROR: 등록되지 않은 branch_code")
