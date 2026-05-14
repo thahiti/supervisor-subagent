@@ -46,3 +46,42 @@ def _resolve_branch_db(db_path: str) -> Path:
     if not resolved.exists():
         raise ValueError(f"존재하지 않는 DB 파일: {resolved.name}")
     return resolved
+
+
+def _read_query(
+    db_file: Path,
+    sql: str,
+    params: dict[str, Any] | None = None,
+) -> tuple[list[str], list[tuple]]:
+    """단발성 read-only sqlite 조회.
+
+    안전망: validate_select_only + mode=ro URI + busy_timeout + LIMIT 100 주입.
+
+    Returns:
+        (columns, rows) 튜플.
+
+    Raises:
+        UnsafeSqlError: SELECT-only 검증 실패.
+        sqlite3.Error: 커넥션/실행 실패.
+    """
+    validate_select_only(sql)
+    safe_sql = inject_limit_if_missing(sql, _ROW_LIMIT)
+    uri = f"file:{db_file}?mode=ro"
+    with sqlite3.connect(uri, uri=True, timeout=_BUSY_TIMEOUT_MS / 1000) as conn:
+        conn.execute(f"PRAGMA busy_timeout = {_BUSY_TIMEOUT_MS}")
+        cur = conn.execute(safe_sql, params or {})
+        cols = [d[0] for d in cur.description]
+        rows = cur.fetchall()
+    return cols, rows
+
+
+def _to_markdown(cols: list[str], rows: list[tuple]) -> str:
+    """결과 표를 markdown 표 문자열로 직렬화한다."""
+    if not rows:
+        return "(결과 없음)"
+    head = "| " + " | ".join(cols) + " |"
+    sep = "| " + " | ".join("---" for _ in cols) + " |"
+    body = "\n".join(
+        "| " + " | ".join(str(v) for v in r) + " |" for r in rows
+    )
+    return "\n".join([head, sep, body])
