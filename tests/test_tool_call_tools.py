@@ -102,3 +102,17 @@ class TestToMarkdown:
 
     def test_empty_rows(self) -> None:
         assert tools._to_markdown(["a"], []) == "(결과 없음)"
+
+
+class TestListBranches:
+    def test_returns_markdown_with_all_branches(self, factory_tmp: Path) -> None:
+        out = tools.list_branches.invoke({})
+        assert "F-A" in out and "아산 1공장" in out
+        assert "F-B" in out and "구미 2공장" in out
+        assert "F-C" in out and "광주 3공장" in out
+        assert "| branch_code |" in out
+
+    def test_no_args_required(self, factory_tmp: Path) -> None:
+        # 인자 없이 invoke 가능
+        out = tools.list_branches.invoke({})
+        assert isinstance(out, str)

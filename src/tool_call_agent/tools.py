@@ -11,6 +11,8 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
+from langchain_core.tools import tool
+
 from src.sql_agent.backend.safety import (
     UnsafeSqlError,
     inject_limit_if_missing,
@@ -85,3 +87,21 @@ def _to_markdown(cols: list[str], rows: list[tuple]) -> str:
         "| " + " | ".join(str(v) for v in r) + " |" for r in rows
     )
     return "\n".join([head, sep, body])
+
+
+@tool
+def list_branches() -> str:
+    """등록된 브랜치(공장) 목록을 markdown 표로 반환한다.
+
+    반환 컬럼: branch_code, branch_name, region.
+    branch_code는 다른 도구의 인자로 사용된다.
+    """
+    try:
+        cols, rows = _read_query(
+            _META_DB,
+            "SELECT branch_code, branch_name, region "
+            "FROM branches ORDER BY branch_code",
+        )
+    except (sqlite3.Error, UnsafeSqlError) as exc:
+        return f"ERROR: 브랜치 목록 조회 실패: {exc}"
+    return _to_markdown(cols, rows)
