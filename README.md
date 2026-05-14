@@ -9,12 +9,13 @@ LangGraph 기반의 멀티 에이전트 시스템. Router가 사용자 요청을
                                        ├→ [translate_agent]      │
                                        ├→ [sql_agent]            ├→ [response_generator] → [END]
                                        ├→ [templated_sql_agent]  │
+                                       ├→ [tool_call_agent]      │
                                        └→ [response_generator] (FINISH)
 ```
 
 - **query_rewriter** — 사용자 쿼리에 시간 표현 해석(예: "지난주" → `2026-04-27~2026-05-03`), 대화 맥락 보충, 용어 사전 치환을 적용해 명확한 형태로 재작성한다.
 - **router** — 단발성 라우팅. 사용자 요청을 분석해 가장 적합한 워커 하나만 선택하고, 적합한 워커가 없으면 `FINISH`로 곧바로 답변 생성 단계로 넘긴다.
-- **subagents** — `math`, `translate`, `sql`, `templated_sql` 중 선택된 하나만 실행된다.
+- **subagents** — `math`, `translate`, `sql`, `templated_sql`, `tool_call` 중 선택된 하나만 실행된다.
 - **response_generator** — 서브에이전트 결과를 페르소나에 맞춰 최종 답변으로 정리하고, 멀티턴 컨텍스트를 위해 `chat_history`에 한 턴(리라이팅된 사용자 질의 + 최종 출력)을 누적한다.
 
 ## Quick Start
@@ -23,6 +24,7 @@ LangGraph 기반의 멀티 에이전트 시스템. Router가 사용자 요청을
 cp .env.example .env              # OPENAI_API_KEY 설정
 uv sync                           # 의존성 설치
 uv run python -m src.cli          # 인터랙티브 CLI 실행 (멀티턴 + 추천)
+uv run python -m res.sample_db.factory.seed  # tool_call용 multi DB 시드 (최초 1회)
 uv run python -m src.main         # 5개 데모 시나리오 일괄 실행
 uv run python -m evals.run        # LLM-as-Judge 평가 실행
 ```
@@ -34,6 +36,7 @@ uv run python -m evals.run        # LLM-as-Judge 평가 실행
 - **D** SQL 조회 (sql) — `res/sample_db/ecommerce.db` 자동 시드
 - **E** 멀티턴 — 1차 응답을 `chat_history`로 인계해 "이거 다시 영어로" 같은 지시어 해석 검증
 - **F** templated_sql 멀티턴 — 변수 부족 → 후보값 조회 → 실행의 3턴 시연
+- **G** `tool_call` 멀티턴 — 제조업 브랜치별 머신 DB 조회 (정보 부족 → 브랜치 목록 → 머신 상태)의 3턴 시퀀스 시연
 
 ## Project Structure
 
@@ -60,12 +63,17 @@ supervisor-subagent/
 │   │   ├── render.py              #   변수 검증 + named-param 바인딩
 │   │   ├── prompt.py              #   action 분류용 시스템 프롬프트
 │   │   └── agent.py               #   wrapper + 4-action 분기
+│   ├── tool_call_agent/      # 함수형 도구 ReAct 기반 멀티 DB 조회 (제조업 브랜치/머신)
+│   │   ├── agent.py          #   ReAct 서브그래프 + wrapper
+│   │   ├── tools.py          #   4개 @tool 함수 + path 화이트리스트 + sqlite 헬퍼
+│   │   └── prompt.py         #   범용 시스템 프롬프트 (도메인 어휘 없음)
 │   └── logging/                  # @log_node 데코레이터 + git diff 스타일 출력
 ├── evals/                        # LLM-as-Judge 평가 시스템
 ├── res/
 │   ├── test_cases.yaml           # 평가 테스트 케이스
 │   ├── suggestions.yaml          # 인터랙티브 CLI 추천 질문 (카테고리=에이전트명)
-│   └── sample_db/                # ecommerce 샘플 DB (스키마 + 시드)
+│   ├── sample_db/                # ecommerce 샘플 DB (스키마 + 시드)
+│   └── sample_db/factory/    # 제조업 메타DB + 3개 브랜치 DB 시드 (tool_call용)
 ├── tests/                        # 단위 테스트 (pytest)
 ├── scripts/                      # 스모크 테스트 등 보조 스크립트
 └── docs/superpowers/             # 설계 문서 (specs, plans)
@@ -89,6 +97,7 @@ supervisor-subagent/
 | `translate` | LLM 직접 호출 | 한↔영 번역 |
 | `sql` | ReAct (frontend/backend 분리) | `execute_sql`, `list_tables`, `get_schema` (read-only SQLite) |
 | `templated_sql` | LLM 직접 호출 + 분기 | 정적 등록 `SqlTemplate` 카탈로그, lookup_sql, `SqlExecutor` 재활용 |
+| `tool_call` | ReAct | `list_branches`, `get_branch_db_path`, `list_machines`, `get_machine_status` (factory 메타DB + 브랜치별 sqlite, read-only) |
 
 새 에이전트 추가는 wrapper 함수에 `@registry.agent("name")` 데코레이터 한 줄과 docstring만으로 끝난다 — 그래프 빌드 코드, 라우터 프롬프트, 라우터 분기 모두 자동으로 반영된다. 자세한 메커니즘은 [AgentRegistry.md](./AgentRegistry.md) 참조.
 
