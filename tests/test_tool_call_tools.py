@@ -148,3 +148,37 @@ class TestListMachines:
         out = tools.list_machines.invoke({"db_path": "branch_Z.db"})
         assert out.startswith("ERROR: 머신 목록 조회 실패")
         assert "존재하지 않는" in out
+
+
+class TestGetMachineStatus:
+    def test_returns_status_row(self, factory_tmp: Path) -> None:
+        db_path = str((factory_tmp / "branch_A.db").resolve())
+        out = tools.get_machine_status.invoke(
+            {"db_path": db_path, "machine_id": "M-001"}
+        )
+        assert "M-001" in out
+        assert "running" in out
+        assert "0.92" in out
+
+    def test_unknown_machine_returns_error(self, factory_tmp: Path) -> None:
+        db_path = str((factory_tmp / "branch_A.db").resolve())
+        out = tools.get_machine_status.invoke(
+            {"db_path": db_path, "machine_id": "M-999"}
+        )
+        assert out.startswith("ERROR: 머신을 찾을 수 없습니다")
+
+
+class TestToolsManifest:
+    def test_tools_list_contains_four_tools(self) -> None:
+        assert len(tools.TOOLS) == 4
+        names = {t.name for t in tools.TOOLS}
+        assert names == {
+            "list_branches",
+            "get_branch_db_path",
+            "list_machines",
+            "get_machine_status",
+        }
+
+    def test_tools_by_name_lookup(self) -> None:
+        assert tools.TOOLS_BY_NAME["list_branches"] is tools.list_branches
+        assert tools.TOOLS_BY_NAME["get_branch_db_path"] is tools.get_branch_db_path
