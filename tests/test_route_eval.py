@@ -114,3 +114,30 @@ class TestQueryRewriterCli:
         out = capsys.readouterr().out
         assert "query    : 지난주 매출 알려줘" in out
         assert "rewritten: 지난주(2026-04-20~2026-04-26) 매출 알려줘" in out
+
+
+class TestQueryRewriterRouterCli:
+    @patch("evals.route_eval.route_trace", return_value=("공장2의 제품 재고를 조사해줘", "tool_call"))
+    def test_prints_query_rewritten_destination(
+        self, _mock_rt: MagicMock, capsys, monkeypatch
+    ) -> None:
+        import scripts.cli.query_rewriter_router as cli
+
+        monkeypatch.setattr(
+            "sys.argv",
+            [
+                "prog",
+                "공장2",
+                "--history",
+                '[{"role":"human","content":"재고 조사"},'
+                '{"role":"ai","content":"어떤 브랜치?"}]',
+            ],
+        )
+        try:
+            cli.main()
+        except SystemExit as e:
+            assert e.code == 0
+        out = capsys.readouterr().out
+        assert "query      : 공장2" in out
+        assert "rewritten  : 공장2의 제품 재고를 조사해줘" in out
+        assert "destination: tool_call" in out
