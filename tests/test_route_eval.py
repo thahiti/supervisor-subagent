@@ -57,3 +57,40 @@ class TestRouteTrace:
         contents = [m.content for m in router_state["messages"]]
         assert "3 더하기 4" in contents and "확장된 질의" in contents
         assert mock_cond.call_args[0][0]["next_agent"] == "math"
+
+
+import argparse
+
+from scripts.cli._common import add_common_args, parse_history, patched_now
+
+
+class TestCliCommon:
+    def test_query_is_positional_nargs_plus(self) -> None:
+        parser = argparse.ArgumentParser()
+        add_common_args(parser)
+        args = parser.parse_args(["지난주", "매출", "알려줘"])
+        assert " ".join(args.query) == "지난주 매출 알려줘"
+        assert args.history == ""
+        assert args.now == ""
+
+    def test_parse_history_empty(self) -> None:
+        assert parse_history("") == []
+        assert parse_history("   ") == []
+
+    def test_parse_history_json(self) -> None:
+        raw = '[{"role":"human","content":"재고"},{"role":"ai","content":"어떤 브랜치?"}]'
+        msgs = parse_history(raw)
+        assert [type(m).__name__ for m in msgs] == ["HumanMessage", "AIMessage"]
+        assert [m.content for m in msgs] == ["재고", "어떤 브랜치?"]
+
+    def test_patched_now_noop_without_value(self) -> None:
+        with patched_now(""):
+            pass  # 예외 없이 통과하면 OK
+
+    def test_patched_now_fixes_rewriter_datetime(self) -> None:
+        from datetime import datetime
+
+        with patched_now("2026-04-29T14:30"):
+            import src.query_rewriter.rewriter as rw_mod
+
+            assert rw_mod.datetime.now() == datetime(2026, 4, 29, 14, 30)
