@@ -107,3 +107,29 @@ uv run python -m evals.run --agent <agent_name>     # 에이전트 필터
 ```
 
 Exit code: `0` (all pass) / `1` (any fail). CI 품질 게이트에 활용 가능.
+
+## query_rewriter / router CLI & Smoke
+
+LLM-as-Judge와 별개로, `query_rewriter` + `router` 파이프라인을 직접
+실행·검증하는 CLI와 스모크가 있다.
+
+CLI (첫 위치인자 = 사용자 질의, 공백 분리 다단어 허용):
+
+- `uv run python -m scripts.cli.query_rewriter 지난주 매출 알려줘 --now 2026-04-29T14:30`
+  → 리라이팅 결과 출력
+- `uv run python -m scripts.cli.query_rewriter_router 공장2 --history '[{"role":"human","content":"재고 조사"},{"role":"ai","content":"어떤 브랜치?"}]'`
+  → 리라이팅 결과 + 라우팅 목적지 출력
+
+옵션: `--history`(chat_history JSON), `--now`(리라이터 기준 시각 ISO,
+지정 시 상대 날짜 변환이 결정적).
+
+스모크 (CLI를 subprocess로 호출, 실제 LLM):
+
+- `uv run python -m scripts.smoke_query_rewriter` — 상대 날짜/지시어 케이스
+  (`--now` 고정으로 날짜는 결정적)
+- `uv run python -m scripts.smoke_query_rewriter_router` — `(history, query)`
+  입력에 대해 라우팅 목적지를 기대값과 결정적으로 비교
+
+파이프라인 코어(`evals/route_eval.py`)의 조립 로직 단위 테스트(LLM 목)는
+`tests/test_route_eval.py`에, 리라이터 노드 자체의 단위 테스트는
+기존 `tests/test_query_rewriter.py`에 있다.
