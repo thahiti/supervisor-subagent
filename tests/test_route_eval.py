@@ -94,3 +94,23 @@ class TestCliCommon:
             import src.query_rewriter.rewriter as rw_mod
 
             assert rw_mod.datetime.now() == datetime(2026, 4, 29, 14, 30)
+
+
+class TestQueryRewriterCli:
+    @patch("evals.route_eval.rewrite", return_value="지난주(2026-04-20~2026-04-26) 매출 알려줘")
+    def test_prints_query_and_rewritten(
+        self, _mock_rw: MagicMock, capsys, monkeypatch
+    ) -> None:
+        import scripts.cli.query_rewriter as cli
+
+        monkeypatch.setattr(
+            "sys.argv",
+            ["prog", "지난주", "매출", "알려줘", "--now", "2026-04-29T14:30"],
+        )
+        try:
+            cli.main()
+        except SystemExit as e:
+            assert e.code == 0
+        out = capsys.readouterr().out
+        assert "query    : 지난주 매출 알려줘" in out
+        assert "rewritten: 지난주(2026-04-20~2026-04-26) 매출 알려줘" in out
