@@ -12,14 +12,18 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from contextlib import contextmanager
 from datetime import datetime
-from typing import Iterator, Literal, NotRequired, cast
+from typing import TYPE_CHECKING, Iterator, Literal, NotRequired, cast
 from unittest.mock import patch
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 
 from src.state import State
+
+if TYPE_CHECKING:
+    from scripts.eval import EvalCase  # 순환 import 회피: 런타임 import 안 함
 
 
 class CliState(State):
@@ -87,6 +91,58 @@ def parse_history(raw: str) -> list[BaseMessage]:
     data = json.loads(raw)
     pairs = [(cast(Role, d["role"]), str(d["content"])) for d in data]
     return to_messages(pairs)
+
+
+def resolve_example(examples: list[EvalCase], key: str) -> EvalCase:
+    """``key``로 예제를 찾아 반환한다. id 매칭이 정수 인덱스보다 우선한다.
+
+    Args:
+        examples: 예제 리스트 (``EvalCase``).
+        key: 예제 id 문자열 또는 음이 아닌 정수 인덱스 문자열.
+
+    Returns:
+        매칭된 예제.
+
+    Raises:
+        SystemExit: 매칭되는 예제가 없거나 인덱스 범위를 벗어날 때.
+            stderr에 사용 가능한 id 목록을 출력한다.
+    """
+    for ex in examples:
+        if ex["id"] == key:
+            return ex
+    try:
+        idx = int(key)
+    except ValueError:
+        idx = None
+    if idx is not None and 0 <= idx < len(examples):
+        return examples[idx]
+    available = ", ".join(ex["id"] for ex in examples)
+    print(
+        f"error: 알 수 없는 예제 '{key}'. 사용 가능: {available}",
+        file=sys.stderr,
+    )
+    raise SystemExit(2)
+
+
+def print_examples(examples: list[EvalCase]) -> None:
+    """예제 목록을 사람이 읽을 수 있는 형태로 stdout에 출력한다.
+
+    각 예제마다 ``[NN] id — description`` 헤더와 마지막 HumanMessage(query)를
+    한 줄씩 보여준다. ``input["chat_history"]``가 있으면 그 아래
+    ``history:`` 블록에 ``[role] content`` 형식으로 함께 출력한다.
+    """
+    for idx, ex in enumerate(examples):
+        print(f"[{idx:02d}] {ex['id']} — {ex['description']}")
+        messages = ex["input"].get("messages", [])
+        query = last_human_text(messages, "")
+        if query:
+            print(f"     query  : {query}")
+        history = ex["input"].get("chat_history", [])
+        if history:
+            print("     history:")
+            for msg in history:
+                role = "human" if isinstance(msg, HumanMessage) else "ai"
+                print(f"              [{role}] {msg.content}")
 
 
 @contextmanager
