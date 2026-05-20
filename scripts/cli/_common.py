@@ -61,11 +61,16 @@ def last_human_text(messages: list[BaseMessage], default: str) -> str:
 
 
 def add_common_args(parser: argparse.ArgumentParser) -> None:
-    """query 위치인자 + --history/--now 옵션을 parser에 추가한다."""
+    """query 위치인자 + --history/--now/--example/--list-examples를 parser에 추가한다.
+
+    ``query``는 ``--example``/``--list-examples`` 사용 시 생략 가능하므로
+    ``nargs="*"``로 둔다. 호출자는 query 부재 시점에서 직접 검증한다.
+    """
     parser.add_argument(
         "query",
-        nargs="+",
-        help="사용자 질의 (여러 단어는 공백으로 이어 붙임; 따옴표 불필요)",
+        nargs="*",
+        help="사용자 질의 (여러 단어는 공백으로 이어 붙임; 따옴표 불필요). "
+        "--example/--list-examples 사용 시 생략",
     )
     parser.add_argument(
         "--history",
@@ -81,6 +86,17 @@ def add_common_args(parser: argparse.ArgumentParser) -> None:
         default="",
         help="리라이터 기준 시각 ISO (예: 2026-04-29T14:30). "
         "지정 시 상대 날짜 변환이 결정적이 된다.",
+    )
+    parser.add_argument(
+        "--example",
+        default="",
+        help="미리 정의된 예제로 실행 (id 또는 정수 인덱스). "
+        "지정 시 query·--history는 무시된다.",
+    )
+    parser.add_argument(
+        "--list-examples",
+        action="store_true",
+        help="사용 가능한 예제 목록을 출력하고 종료한다.",
     )
 
 
