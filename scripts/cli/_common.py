@@ -88,15 +88,21 @@ def add_common_args(parser: argparse.ArgumentParser) -> None:
         "지정 시 상대 날짜 변환이 결정적이 된다.",
     )
     parser.add_argument(
+        "--examples",
+        default="",
+        help="예제 YAML 파일 경로. --example/--list-examples 사용 시 필수. "
+        "예: scripts/examples/rewriter.yml",
+    )
+    parser.add_argument(
         "--example",
         default="",
         help="미리 정의된 예제로 실행 (id 또는 정수 인덱스). "
-        "지정 시 query·--history는 무시된다.",
+        "지정 시 query·--history는 무시된다. --examples로 YAML 경로를 함께 줘야 한다.",
     )
     parser.add_argument(
         "--list-examples",
         action="store_true",
-        help="사용 가능한 예제 목록을 출력하고 종료한다.",
+        help="--examples로 지정한 YAML의 예제 목록을 출력하고 종료한다.",
     )
 
 
@@ -143,14 +149,13 @@ def resolve_example(examples: list[EvalCase], key: str) -> EvalCase:
 def print_examples(examples: list[EvalCase]) -> None:
     """예제 목록을 사람이 읽을 수 있는 형태로 stdout에 출력한다.
 
-    각 예제마다 ``[NN] id — description`` 헤더와 마지막 HumanMessage(query)를
+    각 예제마다 ``[NN] id — description`` 헤더와 ``input["query"]``를
     한 줄씩 보여준다. ``input["chat_history"]``가 있으면 그 아래
     ``history:`` 블록에 ``[role] content`` 형식으로 함께 출력한다.
     """
     for idx, ex in enumerate(examples):
         print(f"[{idx:02d}] {ex['id']} — {ex['description']}")
-        messages = ex["input"].get("messages", [])
-        query = last_human_text(messages, "")
+        query = ex["input"].get("query", "")
         if query:
             print(f"     query  : {query}")
         history = ex["input"].get("chat_history", [])
@@ -159,6 +164,22 @@ def print_examples(examples: list[EvalCase]) -> None:
             for msg in history:
                 role = "human" if isinstance(msg, HumanMessage) else "ai"
                 print(f"              [{role}] {msg.content}")
+
+
+def build_initial_state(input_data: dict) -> CliState:
+    """예제 ``input`` 딕셔너리에서 ``CliState``를 만든다.
+
+    ``input["query"]``를 ``HumanMessage``로 감싸 ``messages``에 넣고,
+    ``input.get("chat_history", [])``를 그대로 유지한다.
+    """
+    query = input_data.get("query", "")
+    chat_history = input_data.get("chat_history", [])
+    messages: list = [HumanMessage(content=query)] if query else []
+    return {
+        "messages": messages,
+        "next_agent": "",
+        "chat_history": chat_history,
+    }
 
 
 @contextmanager

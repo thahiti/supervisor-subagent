@@ -14,19 +14,19 @@ import argparse
 import sys
 
 from dotenv import load_dotenv
-from langchain_core.messages import HumanMessage
 from langgraph.graph.message import add_messages
 
 from scripts.cli._common import (
     CliState,
     add_common_args,
+    build_initial_state,
     last_human_text,
     parse_history,
     patched_now,
     print_examples,
     resolve_example,
 )
-from scripts.cli._examples import REWRITER_EXAMPLES
+from scripts.eval import load_examples
 from src.query_rewriter.rewriter import query_rewriter_node
 
 
@@ -59,25 +59,24 @@ def main() -> None:
     add_common_args(parser)
     args = parser.parse_args()
 
+    use_examples = args.list_examples or args.example
+    if use_examples and not args.examples:
+        parser.error("--example/--list-examples 사용 시 --examples <yaml>이 필요합니다")
+
     if args.list_examples:
-        print_examples(REWRITER_EXAMPLES)
+        print_examples(load_examples(args.examples))
         sys.exit(0)
 
     if args.example:
-        ex = resolve_example(REWRITER_EXAMPLES, args.example)
-        baseline: CliState = {"messages": [], "next_agent": "", "chat_history": []}
-        initial: CliState = {**baseline, **ex["input"]}
-        query = last_human_text(initial["messages"], "")
+        ex = resolve_example(load_examples(args.examples), args.example)
+        initial = build_initial_state(ex["input"])
+        query = ex["input"].get("query", "")
     else:
         if not args.query:
             parser.error("query 또는 --example/--list-examples 중 하나가 필요합니다")
         query = " ".join(args.query)
         history = parse_history(args.history)
-        initial = {
-            "messages": [HumanMessage(content=query)],
-            "next_agent": "",
-            "chat_history": history,
-        }
+        initial = build_initial_state({"query": query, "chat_history": history})
 
     with patched_now(args.now):
         result = rewrite(initial)
