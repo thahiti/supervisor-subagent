@@ -1,16 +1,23 @@
-"""route_eval 코어 단위 테스트.
+"""query_rewriter / router 파이프라인 단위 테스트.
 
-LLM 호출 없이 노드 조립 로직만 검증한다. 실제 LLM 검증은
-scripts/ 스모크 스크립트가 CLI를 subprocess로 실행해 수행한다.
+LLM 호출 없이 조립 로직만 검증한다. 워크플로우(`rewrite`, `route_trace`)는
+각각 `scripts.cli.query_rewriter`와 `scripts.cli.query_rewriter_router`
+모듈이 직접 소유하므로, 패치 타겟은 각 모듈에서 import된 이름이다.
+
+실제 LLM 검증은 scripts/ 스모크 스크립트가 in-process로 워크플로우
+함수들을 직접 호출해 수행한다.
 """
 
 from __future__ import annotations
 
+import argparse
 from unittest.mock import MagicMock, patch
 
 from langchain_core.messages import AIMessage, HumanMessage
 
-from evals.route_eval import rewrite, route_trace, to_messages
+from scripts.cli._common import add_common_args, parse_history, patched_now, to_messages
+from scripts.cli.query_rewriter import rewrite
+from scripts.cli.query_rewriter_router import route_trace
 
 
 class TestToMessages:
@@ -24,21 +31,21 @@ class TestToMessages:
 
 
 class TestRewrite:
-    @patch("evals.route_eval.query_rewriter_node")
+    @patch("scripts.cli.query_rewriter.query_rewriter_node")
     def test_returns_rewritten_text(self, mock_rw: MagicMock) -> None:
         mock_rw.return_value = {"messages": [HumanMessage(content="확장된 질의")]}
         assert rewrite("원본", []) == "확장된 질의"
 
-    @patch("evals.route_eval.query_rewriter_node")
+    @patch("scripts.cli.query_rewriter.query_rewriter_node")
     def test_falls_back_to_original_when_no_change(self, mock_rw: MagicMock) -> None:
         mock_rw.return_value = {"messages": []}
         assert rewrite("원본", []) == "원본"
 
 
 class TestRouteTrace:
-    @patch("evals.route_eval.router_conditional")
-    @patch("evals.route_eval.router_node")
-    @patch("evals.route_eval.query_rewriter_node")
+    @patch("scripts.cli.query_rewriter_router.router_conditional")
+    @patch("scripts.cli.query_rewriter_router.router_node")
+    @patch("scripts.cli.query_rewriter_router.query_rewriter_node")
     def test_returns_rewritten_and_destination(
         self, mock_rw: MagicMock, mock_router: MagicMock, mock_cond: MagicMock
     ) -> None:
@@ -47,21 +54,16 @@ class TestRouteTrace:
             "messages": [AIMessage(content='{"next": "math"}')],
             "next_agent": "math",
         }
-        mock_cond.return_value = "math"
+        mock_cond.return_value = "math_agent"
 
         rewritten, dest = route_trace("3 더하기 4", [AIMessage(content="prev")])
 
         assert rewritten == "확장된 질의"
-        assert dest == "math"
+        assert dest == "math_agent"
         router_state = mock_router.call_args[0][0]
         contents = [m.content for m in router_state["messages"]]
         assert "3 더하기 4" in contents and "확장된 질의" in contents
         assert mock_cond.call_args[0][0]["next_agent"] == "math"
-
-
-import argparse
-
-from scripts.cli._common import add_common_args, parse_history, patched_now
 
 
 class TestCliCommon:
@@ -97,7 +99,10 @@ class TestCliCommon:
 
 
 class TestQueryRewriterCli:
-    @patch("evals.route_eval.rewrite", return_value="지난주(2026-04-20~2026-04-26) 매출 알려줘")
+    @patch(
+        "scripts.cli.query_rewriter.rewrite",
+        return_value="지난주(2026-04-20~2026-04-26) 매출 알려줘",
+    )
     def test_prints_query_and_rewritten(
         self, _mock_rw: MagicMock, capsys, monkeypatch
     ) -> None:
@@ -117,7 +122,10 @@ class TestQueryRewriterCli:
 
 
 class TestQueryRewriterRouterCli:
-    @patch("evals.route_eval.route_trace", return_value=("공장2의 제품 재고를 조사해줘", "tool_call"))
+    @patch(
+        "scripts.cli.query_rewriter_router.route_trace",
+        return_value=("공장2의 제품 재고를 조사해줘", "tool_call_agent"),
+    )
     def test_prints_query_rewritten_destination(
         self, _mock_rt: MagicMock, capsys, monkeypatch
     ) -> None:
@@ -140,4 +148,4 @@ class TestQueryRewriterRouterCli:
         out = capsys.readouterr().out
         assert "query      : 공장2" in out
         assert "rewritten  : 공장2의 제품 재고를 조사해줘" in out
-        assert "destination: tool_call" in out
+        assert "destination: tool_call_agent" in out
