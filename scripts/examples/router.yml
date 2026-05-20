@@ -1,0 +1,51 @@
+# query_rewriter + router 워크플로우의 예제·평가 케이스.
+#
+# 사용:
+#   - CLI:   uv run python -m scripts.cli.query_rewriter_router \
+#              --examples scripts/examples/router.yml --example 0
+#   - 스모크: uv run python -m scripts.smoke_query_rewriter_router
+
+- id: single-math
+  description: "단일턴 수학 → math_agent"
+  input:
+    query: "3 곱하기 7은 얼마야?"
+  expected:
+    next_node: math_agent
+
+- id: single-translate
+  description: "단일턴 번역 → translate_agent"
+  input:
+    query: "'안녕하세요'를 영어로 번역해줘"
+  expected:
+    next_node: translate_agent
+
+- id: single-sql
+  description: "단일턴 SQL → sql_agent"
+  input:
+    query: "연봉이 5천만원 이상인 직원은 몇 명이야?"
+  expected:
+    next_node: sql_agent
+
+- id: multiturn-toolcall
+  description: "공장2 단답 복원 → tool_call_agent"
+  input:
+    query: "공장2"
+    chat_history:
+      - role: human
+        content: "브랜치에서 제품 재고 조사해줘"
+      - role: ai
+        content: "어떤 브랜치에서 재고를 조사할까요?"
+  expected:
+    next_node: tool_call_agent
+
+- id: multiturn-translate-referent
+  description: "이거 다시 일본어로 → translate_agent"
+  input:
+    query: "이거 다시 일본어로"
+    chat_history:
+      - role: human
+        content: "'좋은 아침입니다'를 영어로 번역해줘"
+      - role: ai
+        content: "Good morning."
+  expected:
+    next_node: translate_agent

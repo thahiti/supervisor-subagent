@@ -1,13 +1,12 @@
 """CLI example helper 단위 테스트.
 
 ``scripts.cli._common.resolve_example`` / ``print_examples``의 동작을
-검증한다. 데이터(``_examples.py``) 자체가 아니라 헬퍼 로직을 본다.
+검증한다. 데이터(YAML) 자체가 아니라 헬퍼 로직을 본다.
 """
 
 from __future__ import annotations
 
 import pytest
-from langchain_core.messages import HumanMessage
 
 from scripts.cli._common import print_examples, resolve_example, to_messages
 from scripts.eval import EvalCase
@@ -17,14 +16,14 @@ FIXTURES: list[EvalCase] = [
     {
         "id": "alpha",
         "description": "alpha case",
-        "input": {"messages": [HumanMessage(content="alpha query")]},
+        "input": {"query": "alpha query"},
         "expected": {},
     },
     {
         "id": "beta:with-history",
         "description": "beta with history",
         "input": {
-            "messages": [HumanMessage(content="beta query")],
+            "query": "beta query",
             "chat_history": to_messages([
                 ("human", "earlier user"),
                 ("ai", "earlier ai"),
@@ -62,8 +61,8 @@ class TestResolveExample:
 
     def test_resolve_id_that_looks_like_int_prefers_id(self) -> None:
         examples: list[EvalCase] = [
-            {"id": "0", "description": "zero", "input": {"messages": []}, "expected": {}},
-            {"id": "other", "description": "other", "input": {"messages": []}, "expected": {}},
+            {"id": "0", "description": "zero", "input": {"query": ""}, "expected": {}},
+            {"id": "other", "description": "other", "input": {"query": ""}, "expected": {}},
         ]
         # "0"은 id로 등록된 경우 id 매칭이 우선 (혼동 방지)
         assert resolve_example(examples, "0") is examples[0]
