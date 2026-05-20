@@ -22,7 +22,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from scripts.cli._common import Role, patched_now, to_messages  # noqa: E402
+from scripts.cli._common import CliState, Role, patched_now, to_messages  # noqa: E402
 from scripts.cli.query_rewriter import rewrite  # noqa: E402
 
 FIXED_NOW = "2026-04-29T14:30"
@@ -103,12 +103,19 @@ CASES: list[Case] = [
 
 def run() -> int:
     """모든 케이스를 in-process로 실행하고 PASS/FAIL을 출력한다."""
+    from langchain_core.messages import HumanMessage
+
     print(f"기준 시각 (FIXED_NOW): {FIXED_NOW}")
     print(f"테스트 케이스: {len(CASES)}건\n")
 
     pass_count = 0
     for idx, case in enumerate(CASES, start=1):
         history = to_messages(list(case.get("history", [])))
+        initial: CliState = {
+            "messages": [HumanMessage(content=case["input"])],
+            "next_agent": "",
+            "chat_history": history,
+        }
 
         rewritten = ""
         missing: list[str] = []
@@ -119,10 +126,11 @@ def run() -> int:
             attempts = attempt
             try:
                 with patched_now(FIXED_NOW):
-                    rewritten = rewrite(case["input"], history)
+                    result = rewrite(initial)
             except Exception as exc:
                 error = f"{type(exc).__name__}: {exc}"
                 break
+            rewritten = result.get("rewritten", "")
             missing = [
                 p for p in case["expected_patterns"] if not re.search(p, rewritten)
             ]

@@ -14,10 +14,25 @@ import argparse
 import json
 from contextlib import contextmanager
 from datetime import datetime
-from typing import Iterator, Literal, cast
+from typing import Iterator, Literal, NotRequired, cast
 from unittest.mock import patch
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
+
+from src.state import State
+
+
+class CliState(State):
+    """CLI 워크플로우(rewrite, route_trace)의 state-IO 타입.
+
+    프로덕션 ``src.state.State``를 확장한다. 입력 단계에는 ``rewritten``과
+    ``next_node``가 없을 수 있고, 워크플로우가 출력 state를 만들 때
+    채워진다.
+    """
+
+    rewritten: NotRequired[str]
+    next_node: NotRequired[str]
+
 
 Role = Literal["human", "ai"]
 

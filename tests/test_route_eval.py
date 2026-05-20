@@ -15,7 +15,13 @@ from unittest.mock import MagicMock, patch
 
 from langchain_core.messages import AIMessage, HumanMessage
 
-from scripts.cli._common import add_common_args, parse_history, patched_now, to_messages
+from scripts.cli._common import (
+    CliState,
+    add_common_args,
+    parse_history,
+    patched_now,
+    to_messages,
+)
 from scripts.cli.query_rewriter import rewrite
 from scripts.cli.query_rewriter_router import route_trace
 
@@ -32,21 +38,36 @@ class TestToMessages:
 
 class TestRewrite:
     @patch("scripts.cli.query_rewriter.query_rewriter_node")
-    def test_returns_rewritten_text(self, mock_rw: MagicMock) -> None:
+    def test_returns_state_with_rewritten_field(self, mock_rw: MagicMock) -> None:
         mock_rw.return_value = {"messages": [HumanMessage(content="확장된 질의")]}
-        assert rewrite("원본", []) == "확장된 질의"
+        state: CliState = {
+            "messages": [HumanMessage(content="원본")],
+            "next_agent": "",
+            "chat_history": [],
+        }
+        result = rewrite(state)
+        assert result["rewritten"] == "확장된 질의"
+        # 원본 messages + 리라이팅 메시지가 모두 누적
+        contents = [m.content for m in result["messages"] if isinstance(m, HumanMessage)]
+        assert "원본" in contents and "확장된 질의" in contents
 
     @patch("scripts.cli.query_rewriter.query_rewriter_node")
     def test_falls_back_to_original_when_no_change(self, mock_rw: MagicMock) -> None:
         mock_rw.return_value = {"messages": []}
-        assert rewrite("원본", []) == "원본"
+        state: CliState = {
+            "messages": [HumanMessage(content="원본")],
+            "next_agent": "",
+            "chat_history": [],
+        }
+        result = rewrite(state)
+        assert result["rewritten"] == "원본"
 
 
 class TestRouteTrace:
     @patch("scripts.cli.query_rewriter_router.router_conditional")
     @patch("scripts.cli.query_rewriter_router.router_node")
     @patch("scripts.cli.query_rewriter_router.query_rewriter_node")
-    def test_returns_rewritten_and_destination(
+    def test_returns_state_with_rewritten_and_next_node(
         self, mock_rw: MagicMock, mock_router: MagicMock, mock_cond: MagicMock
     ) -> None:
         mock_rw.return_value = {"messages": [HumanMessage(content="확장된 질의")]}
@@ -56,12 +77,19 @@ class TestRouteTrace:
         }
         mock_cond.return_value = "math_agent"
 
-        rewritten, dest = route_trace("3 더하기 4", [AIMessage(content="prev")])
+        state: CliState = {
+            "messages": [HumanMessage(content="3 더하기 4")],
+            "next_agent": "",
+            "chat_history": [AIMessage(content="prev")],
+        }
+        result = route_trace(state)
 
-        assert rewritten == "확장된 질의"
-        assert dest == "math_agent"
+        assert result["rewritten"] == "확장된 질의"
+        assert result["next_agent"] == "math"
+        assert result["next_node"] == "math_agent"
+        # router_node가 받은 state에는 원본+리라이팅 메시지가 둘 다 누적되어 있어야 함
         router_state = mock_router.call_args[0][0]
-        contents = [m.content for m in router_state["messages"]]
+        contents = [m.content for m in router_state["messages"] if isinstance(m, HumanMessage)]
         assert "3 더하기 4" in contents and "확장된 질의" in contents
         assert mock_cond.call_args[0][0]["next_agent"] == "math"
 
@@ -99,15 +127,18 @@ class TestCliCommon:
 
 
 class TestQueryRewriterCli:
-    @patch(
-        "scripts.cli.query_rewriter.rewrite",
-        return_value="지난주(2026-04-20~2026-04-26) 매출 알려줘",
-    )
+    @patch("scripts.cli.query_rewriter.rewrite")
     def test_prints_query_and_rewritten(
-        self, _mock_rw: MagicMock, capsys, monkeypatch
+        self, mock_rw: MagicMock, capsys, monkeypatch
     ) -> None:
         import scripts.cli.query_rewriter as cli
 
+        mock_rw.return_value = {
+            "messages": [HumanMessage(content="지난주(2026-04-20~2026-04-26) 매출 알려줘")],
+            "next_agent": "",
+            "chat_history": [],
+            "rewritten": "지난주(2026-04-20~2026-04-26) 매출 알려줘",
+        }
         monkeypatch.setattr(
             "sys.argv",
             ["prog", "지난주", "매출", "알려줘", "--now", "2026-04-29T14:30"],
@@ -122,15 +153,19 @@ class TestQueryRewriterCli:
 
 
 class TestQueryRewriterRouterCli:
-    @patch(
-        "scripts.cli.query_rewriter_router.route_trace",
-        return_value=("공장2의 제품 재고를 조사해줘", "tool_call_agent"),
-    )
+    @patch("scripts.cli.query_rewriter_router.route_trace")
     def test_prints_query_rewritten_destination(
-        self, _mock_rt: MagicMock, capsys, monkeypatch
+        self, mock_rt: MagicMock, capsys, monkeypatch
     ) -> None:
         import scripts.cli.query_rewriter_router as cli
 
+        mock_rt.return_value = {
+            "messages": [HumanMessage(content="공장2의 제품 재고를 조사해줘")],
+            "next_agent": "tool_call",
+            "chat_history": [],
+            "rewritten": "공장2의 제품 재고를 조사해줘",
+            "next_node": "tool_call_agent",
+        }
         monkeypatch.setattr(
             "sys.argv",
             [
