@@ -13,7 +13,11 @@ op 추론 규칙:
 from __future__ import annotations
 
 import re
-from typing import Any, Callable, NotRequired, TypedDict
+from pathlib import Path
+from typing import Any, Callable, NotRequired, TypedDict, cast
+
+import yaml
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 
 from scripts.cli._common import CliState, patched_now
 
@@ -40,6 +44,75 @@ class EvalCase(TypedDict):
     description: str
     input: dict[str, Any]
     expected: dict[str, Any]
+
+
+class _ExamplesLoader(yaml.SafeLoader):
+    """``!regex`` / ``!regex_all`` 태그를 ``re.Pattern``으로 변환하는 SafeLoader."""
+
+
+def _regex_ctor(loader: _ExamplesLoader, node: yaml.Node) -> re.Pattern[str]:
+    return re.compile(loader.construct_scalar(cast(yaml.ScalarNode, node)))
+
+
+def _regex_all_ctor(
+    loader: _ExamplesLoader, node: yaml.Node
+) -> list[re.Pattern[str]]:
+    raw = loader.construct_sequence(cast(yaml.SequenceNode, node))
+    return [re.compile(str(p)) for p in raw]
+
+
+_ExamplesLoader.add_constructor("!regex", _regex_ctor)
+_ExamplesLoader.add_constructor("!regex_all", _regex_all_ctor)
+
+
+def _to_message(item: dict[str, Any]) -> BaseMessage:
+    """{role, content} 항목을 BaseMessage로 변환한다."""
+    role = item["role"]
+    content = str(item["content"])
+    if role == "human":
+        return HumanMessage(content=content)
+    if role == "ai":
+        return AIMessage(content=content)
+    raise ValueError(f"unsupported role: {role!r} (지원: 'human', 'ai')")
+
+
+def load_examples(path: str | Path) -> list[EvalCase]:
+    """YAML 파일에서 예제 리스트를 읽어 EvalCase 리스트로 반환한다.
+
+    YAML 스키마 (top-level list):
+        - id: str
+          description: str
+          input:
+            query: str
+            chat_history:                # optional
+              - {role: human|ai, content: str}
+          expected:
+            <field>: <scalar | !regex "..." | !regex_all [...]>
+
+    파싱 시 ``chat_history``의 각 항목은 ``BaseMessage``로 변환된다.
+    ``!regex``/``!regex_all`` 태그는 ``re.Pattern`` 또는 그 리스트로 변환된다.
+
+    Raises:
+        FileNotFoundError: 파일이 없을 때.
+        ValueError: 지원하지 않는 role.
+    """
+    p = Path(path)
+    text = p.read_text(encoding="utf-8")
+    raw = yaml.load(text, Loader=_ExamplesLoader)
+    if raw is None:
+        return []
+    cases: list[EvalCase] = []
+    for entry in raw:
+        input_data = dict(entry.get("input", {}))
+        if "chat_history" in input_data:
+            input_data["chat_history"] = [_to_message(m) for m in input_data["chat_history"]]
+        cases.append({
+            "id": entry["id"],
+            "description": entry["description"],
+            "input": input_data,
+            "expected": entry.get("expected", {}),
+        })
+    return cases
 
 
 def _check(expected_value: Any, actual: Any) -> bool:
