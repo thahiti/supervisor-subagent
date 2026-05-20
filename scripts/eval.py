@@ -14,12 +14,12 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Any, Callable, NotRequired, TypedDict, cast
+from typing import Any, Callable, TypedDict, cast
 
 import yaml
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 
-from scripts.cli._common import CliState, patched_now
+from scripts.cli._common import CliState, build_initial_state, patched_now
 
 
 class _Missing:
@@ -128,16 +128,6 @@ def _check(expected_value: Any, actual: Any) -> bool:
     return actual == expected_value
 
 
-def _build_initial_state(overrides: dict[str, Any]) -> CliState:
-    """베이스라인 CliState에 ``overrides``를 머지하여 입력 state를 만든다."""
-    baseline: CliState = {
-        "messages": [],
-        "next_agent": "",
-        "chat_history": [],
-    }
-    return {**baseline, **overrides}
-
-
 def _check_case(
     expected: dict[str, Any], result: CliState
 ) -> tuple[bool, dict[str, tuple[Any, Any]]]:
@@ -215,7 +205,7 @@ def run_eval(
             for attempt in range(1, max_retries + 1):
                 attempts = attempt
                 try:
-                    result = workflow(_build_initial_state(case["input"]))
+                    result = workflow(build_initial_state(case["input"]))
                 except Exception as exc:
                     error = f"{type(exc).__name__}: {exc}"
                     break

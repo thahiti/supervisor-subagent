@@ -192,23 +192,29 @@ from scripts.eval import EvalCase, run_eval
 
 
 class TestRunEvalAssertions:
-    """op 추론 (str=eq, Pattern=regex, list[Pattern]=AND) 검증."""
+    """op 추론 (str=eq, Pattern=regex, list[Pattern]=AND) 검증.
+
+    새 스키마(input.query/chat_history만 허용)에서는 임의 필드를 input으로
+    주입할 수 없으므로, 어션 대상 값은 워크플로우 반환에서 만든다.
+    """
 
     @staticmethod
-    def _id_workflow(state: CliState) -> CliState:
-        """입력 state를 그대로 반환하는 항등 워크플로우 (어션만 검증할 때 사용)."""
-        return state
+    def _workflow_returning(extra: dict) -> "callable[[CliState], CliState]":
+        """입력 state에 ``extra``를 머지해 반환하는 워크플로우 팩토리."""
+        def _wf(state: CliState) -> CliState:
+            return {**state, **extra}
+        return _wf
 
     def test_eq_match_passes(self, capsys) -> None:
         cases: list[EvalCase] = [
             {
                 "id": "eq-pass",
                 "description": "eq pass",
-                "input": {"next_agent": "math"},
+                "input": {"query": "x"},
                 "expected": {"next_agent": "math"},
             }
         ]
-        assert run_eval(cases, self._id_workflow) == 0
+        assert run_eval(cases, self._workflow_returning({"next_agent": "math"})) == 0
         assert "1/1 통과" in capsys.readouterr().out
 
     def test_eq_mismatch_fails(self, capsys) -> None:
@@ -216,11 +222,11 @@ class TestRunEvalAssertions:
             {
                 "id": "eq-fail",
                 "description": "eq fail",
-                "input": {"next_agent": "math"},
+                "input": {"query": "x"},
                 "expected": {"next_agent": "sql"},
             }
         ]
-        assert run_eval(cases, self._id_workflow) == 1
+        assert run_eval(cases, self._workflow_returning({"next_agent": "math"})) == 1
         out = capsys.readouterr().out
         assert "FAIL" in out and "0/1 통과" in out
 
@@ -229,11 +235,12 @@ class TestRunEvalAssertions:
             {
                 "id": "regex-pass",
                 "description": "regex pass",
-                "input": {"rewritten": "2026-04-29 매출 알려줘"},
+                "input": {"query": "x"},
                 "expected": {"rewritten": re.compile(r"2026-04-29")},
             }
         ]
-        assert run_eval(cases, self._id_workflow) == 0
+        wf = self._workflow_returning({"rewritten": "2026-04-29 매출 알려줘"})
+        assert run_eval(cases, wf) == 0
 
     def test_list_of_patterns_requires_all(self, capsys) -> None:
         # 둘 다 매치 → PASS
@@ -241,13 +248,14 @@ class TestRunEvalAssertions:
             {
                 "id": "and-pass",
                 "description": "and pass",
-                "input": {"rewritten": "2026-04-20부터 2026-04-26"},
+                "input": {"query": "x"},
                 "expected": {
                     "rewritten": [re.compile(r"2026-04-20"), re.compile(r"2026-04-26")],
                 },
             }
         ]
-        assert run_eval(ok, self._id_workflow) == 0
+        wf_ok = self._workflow_returning({"rewritten": "2026-04-20부터 2026-04-26"})
+        assert run_eval(ok, wf_ok) == 0
         capsys.readouterr()  # drain
 
         # 둘 중 하나라도 빠지면 FAIL
@@ -255,24 +263,26 @@ class TestRunEvalAssertions:
             {
                 "id": "and-fail",
                 "description": "and fail",
-                "input": {"rewritten": "2026-04-20만 있음"},
+                "input": {"query": "x"},
                 "expected": {
                     "rewritten": [re.compile(r"2026-04-20"), re.compile(r"2026-04-26")],
                 },
             }
         ]
-        assert run_eval(fail, self._id_workflow) == 1
+        wf_fail = self._workflow_returning({"rewritten": "2026-04-20만 있음"})
+        assert run_eval(fail, wf_fail) == 1
 
     def test_missing_field_fails(self, capsys) -> None:
         cases: list[EvalCase] = [
             {
                 "id": "missing",
                 "description": "missing",
-                "input": {},
+                "input": {"query": "x"},
                 "expected": {"next_node": "math_agent"},
             }
         ]
-        assert run_eval(cases, self._id_workflow) == 1
+        # 항등 워크플로우는 next_node를 채우지 않음 → <missing>
+        assert run_eval(cases, lambda s: s) == 1
         assert "<missing>" in capsys.readouterr().out
 
 
@@ -337,19 +347,47 @@ class TestRunEvalNow:
         assert run_eval(cases, self._check_now_workflow, now="2026-04-29T14:30") == 0
 
 
-class TestRunEvalInputMerge:
-    @staticmethod
-    def _echo_workflow(state: CliState) -> CliState:
-        return state
+class TestRunEvalInputBuilding:
+    """build_initial_state가 input.query/chat_history로부터 올바른 state를 만드는지."""
 
-    def test_baseline_state_provides_empty_defaults(self) -> None:
-        # input에 messages/chat_history 미설정 → baseline empty가 사용됨
+    def test_query_only_creates_state_with_humanmessage_and_empty_history(self) -> None:
+        captured: list[CliState] = []
+
+        def capture(state: CliState) -> CliState:
+            captured.append(state)
+            return state
+
         cases: list[EvalCase] = [
             {
-                "id": "baseline",
-                "description": "baseline",
-                "input": {"next_agent": "sql"},
-                "expected": {"next_agent": "sql"},
+                "id": "q-only",
+                "description": "query only",
+                "input": {"query": "hello world"},
+                "expected": {},
             }
         ]
-        assert run_eval(cases, self._echo_workflow) == 0
+        assert run_eval(cases, capture) == 0
+        state = captured[0]
+        assert len(state["messages"]) == 1
+        assert isinstance(state["messages"][0], HumanMessage)
+        assert state["messages"][0].content == "hello world"
+        assert state["chat_history"] == []
+        assert state["next_agent"] == ""
+
+    def test_chat_history_passed_through(self) -> None:
+        captured: list[CliState] = []
+
+        def capture(state: CliState) -> CliState:
+            captured.append(state)
+            return state
+
+        history = to_messages([("human", "prev q"), ("ai", "prev a")])
+        cases: list[EvalCase] = [
+            {
+                "id": "with-hist",
+                "description": "with history",
+                "input": {"query": "now", "chat_history": history},
+                "expected": {},
+            }
+        ]
+        assert run_eval(cases, capture) == 0
+        assert captured[0]["chat_history"] == history
