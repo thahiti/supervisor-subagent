@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from scripts.cli._common import Role, to_messages  # noqa: E402
+from scripts.cli._common import CliState, Role, to_messages  # noqa: E402
 from scripts.cli.query_rewriter_router import route_trace  # noqa: E402
 
 
@@ -72,14 +72,24 @@ CASES: list[RouteCase] = [
 
 def run() -> int:
     """모든 케이스를 in-process로 실행하고 PASS/FAIL을 출력한다."""
+    from langchain_core.messages import HumanMessage
+
     pass_count = 0
     for idx, case in enumerate(CASES, start=1):
         history = to_messages(case["history"])
+        initial: CliState = {
+            "messages": [HumanMessage(content=case["query"])],
+            "next_agent": "",
+            "chat_history": history,
+        }
+
         rewritten = ""
         actual = ""
         error: str | None = None
         try:
-            rewritten, actual = route_trace(case["query"], history)
+            result = route_trace(initial)
+            rewritten = result.get("rewritten", "")
+            actual = result.get("next_node", "")
         except Exception as exc:
             error = f"{type(exc).__name__}: {exc}"
 
