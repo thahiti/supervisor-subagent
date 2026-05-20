@@ -23,7 +23,10 @@ from scripts.cli._common import (
     last_human_text,
     parse_history,
     patched_now,
+    print_examples,
+    resolve_example,
 )
+from scripts.cli._examples import REWRITER_EXAMPLES
 from src.query_rewriter.rewriter import query_rewriter_node
 
 
@@ -56,14 +59,25 @@ def main() -> None:
     add_common_args(parser)
     args = parser.parse_args()
 
-    query = " ".join(args.query)
-    history = parse_history(args.history)
+    if args.list_examples:
+        print_examples(REWRITER_EXAMPLES)
+        sys.exit(0)
 
-    initial: CliState = {
-        "messages": [HumanMessage(content=query)],
-        "next_agent": "",
-        "chat_history": history,
-    }
+    if args.example:
+        ex = resolve_example(REWRITER_EXAMPLES, args.example)
+        baseline: CliState = {"messages": [], "next_agent": "", "chat_history": []}
+        initial: CliState = {**baseline, **ex["input"]}
+        query = last_human_text(initial["messages"], "")
+    else:
+        if not args.query:
+            parser.error("query 또는 --example/--list-examples 중 하나가 필요합니다")
+        query = " ".join(args.query)
+        history = parse_history(args.history)
+        initial = {
+            "messages": [HumanMessage(content=query)],
+            "next_agent": "",
+            "chat_history": history,
+        }
 
     with patched_now(args.now):
         result = rewrite(initial)

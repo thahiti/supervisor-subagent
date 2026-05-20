@@ -12,14 +12,18 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from contextlib import contextmanager
 from datetime import datetime
-from typing import Iterator, Literal, NotRequired, cast
+from typing import TYPE_CHECKING, Iterator, Literal, NotRequired, cast
 from unittest.mock import patch
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 
 from src.state import State
+
+if TYPE_CHECKING:
+    from scripts.eval import EvalCase  # 순환 import 회피: 런타임 import 안 함
 
 
 class CliState(State):
@@ -57,11 +61,16 @@ def last_human_text(messages: list[BaseMessage], default: str) -> str:
 
 
 def add_common_args(parser: argparse.ArgumentParser) -> None:
-    """query 위치인자 + --history/--now 옵션을 parser에 추가한다."""
+    """query 위치인자 + --history/--now/--example/--list-examples를 parser에 추가한다.
+
+    ``query``는 ``--example``/``--list-examples`` 사용 시 생략 가능하므로
+    ``nargs="*"``로 둔다. 호출자는 query 부재 시점에서 직접 검증한다.
+    """
     parser.add_argument(
         "query",
-        nargs="+",
-        help="사용자 질의 (여러 단어는 공백으로 이어 붙임; 따옴표 불필요)",
+        nargs="*",
+        help="사용자 질의 (여러 단어는 공백으로 이어 붙임; 따옴표 불필요). "
+        "--example/--list-examples 사용 시 생략",
     )
     parser.add_argument(
         "--history",
@@ -78,6 +87,17 @@ def add_common_args(parser: argparse.ArgumentParser) -> None:
         help="리라이터 기준 시각 ISO (예: 2026-04-29T14:30). "
         "지정 시 상대 날짜 변환이 결정적이 된다.",
     )
+    parser.add_argument(
+        "--example",
+        default="",
+        help="미리 정의된 예제로 실행 (id 또는 정수 인덱스). "
+        "지정 시 query·--history는 무시된다.",
+    )
+    parser.add_argument(
+        "--list-examples",
+        action="store_true",
+        help="사용 가능한 예제 목록을 출력하고 종료한다.",
+    )
 
 
 def parse_history(raw: str) -> list[BaseMessage]:
@@ -87,6 +107,58 @@ def parse_history(raw: str) -> list[BaseMessage]:
     data = json.loads(raw)
     pairs = [(cast(Role, d["role"]), str(d["content"])) for d in data]
     return to_messages(pairs)
+
+
+def resolve_example(examples: list[EvalCase], key: str) -> EvalCase:
+    """``key``로 예제를 찾아 반환한다. id 매칭이 정수 인덱스보다 우선한다.
+
+    Args:
+        examples: 예제 리스트 (``EvalCase``).
+        key: 예제 id 문자열 또는 음이 아닌 정수 인덱스 문자열.
+
+    Returns:
+        매칭된 예제.
+
+    Raises:
+        SystemExit: 매칭되는 예제가 없거나 인덱스 범위를 벗어날 때.
+            stderr에 사용 가능한 id 목록을 출력한다.
+    """
+    for ex in examples:
+        if ex["id"] == key:
+            return ex
+    try:
+        idx = int(key)
+    except ValueError:
+        idx = None
+    if idx is not None and 0 <= idx < len(examples):
+        return examples[idx]
+    available = ", ".join(ex["id"] for ex in examples)
+    print(
+        f"error: 알 수 없는 예제 '{key}'. 사용 가능: {available}",
+        file=sys.stderr,
+    )
+    raise SystemExit(2)
+
+
+def print_examples(examples: list[EvalCase]) -> None:
+    """예제 목록을 사람이 읽을 수 있는 형태로 stdout에 출력한다.
+
+    각 예제마다 ``[NN] id — description`` 헤더와 마지막 HumanMessage(query)를
+    한 줄씩 보여준다. ``input["chat_history"]``가 있으면 그 아래
+    ``history:`` 블록에 ``[role] content`` 형식으로 함께 출력한다.
+    """
+    for idx, ex in enumerate(examples):
+        print(f"[{idx:02d}] {ex['id']} — {ex['description']}")
+        messages = ex["input"].get("messages", [])
+        query = last_human_text(messages, "")
+        if query:
+            print(f"     query  : {query}")
+        history = ex["input"].get("chat_history", [])
+        if history:
+            print("     history:")
+            for msg in history:
+                role = "human" if isinstance(msg, HumanMessage) else "ai"
+                print(f"              [{role}] {msg.content}")
 
 
 @contextmanager
