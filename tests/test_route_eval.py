@@ -15,7 +15,13 @@ from unittest.mock import MagicMock, patch
 
 from langchain_core.messages import AIMessage, HumanMessage
 
-from scripts.cli._common import add_common_args, parse_history, patched_now, to_messages
+from scripts.cli._common import (
+    CliState,
+    add_common_args,
+    parse_history,
+    patched_now,
+    to_messages,
+)
 from scripts.cli.query_rewriter import rewrite
 from scripts.cli.query_rewriter_router import route_trace
 
@@ -32,21 +38,36 @@ class TestToMessages:
 
 class TestRewrite:
     @patch("scripts.cli.query_rewriter.query_rewriter_node")
-    def test_returns_rewritten_text(self, mock_rw: MagicMock) -> None:
+    def test_returns_state_with_rewritten_field(self, mock_rw: MagicMock) -> None:
         mock_rw.return_value = {"messages": [HumanMessage(content="확장된 질의")]}
-        assert rewrite("원본", []) == "확장된 질의"
+        state: CliState = {
+            "messages": [HumanMessage(content="원본")],
+            "next_agent": "",
+            "chat_history": [],
+        }
+        result = rewrite(state)
+        assert result["rewritten"] == "확장된 질의"
+        # 원본 messages + 리라이팅 메시지가 모두 누적
+        contents = [m.content for m in result["messages"] if isinstance(m, HumanMessage)]
+        assert "원본" in contents and "확장된 질의" in contents
 
     @patch("scripts.cli.query_rewriter.query_rewriter_node")
     def test_falls_back_to_original_when_no_change(self, mock_rw: MagicMock) -> None:
         mock_rw.return_value = {"messages": []}
-        assert rewrite("원본", []) == "원본"
+        state: CliState = {
+            "messages": [HumanMessage(content="원본")],
+            "next_agent": "",
+            "chat_history": [],
+        }
+        result = rewrite(state)
+        assert result["rewritten"] == "원본"
 
 
 class TestRouteTrace:
     @patch("scripts.cli.query_rewriter_router.router_conditional")
     @patch("scripts.cli.query_rewriter_router.router_node")
     @patch("scripts.cli.query_rewriter_router.query_rewriter_node")
-    def test_returns_rewritten_and_destination(
+    def test_returns_state_with_rewritten_and_next_node(
         self, mock_rw: MagicMock, mock_router: MagicMock, mock_cond: MagicMock
     ) -> None:
         mock_rw.return_value = {"messages": [HumanMessage(content="확장된 질의")]}
@@ -56,12 +77,19 @@ class TestRouteTrace:
         }
         mock_cond.return_value = "math_agent"
 
-        rewritten, dest = route_trace("3 더하기 4", [AIMessage(content="prev")])
+        state: CliState = {
+            "messages": [HumanMessage(content="3 더하기 4")],
+            "next_agent": "",
+            "chat_history": [AIMessage(content="prev")],
+        }
+        result = route_trace(state)
 
-        assert rewritten == "확장된 질의"
-        assert dest == "math_agent"
+        assert result["rewritten"] == "확장된 질의"
+        assert result["next_agent"] == "math"
+        assert result["next_node"] == "math_agent"
+        # router_node가 받은 state에는 원본+리라이팅 메시지가 둘 다 누적되어 있어야 함
         router_state = mock_router.call_args[0][0]
-        contents = [m.content for m in router_state["messages"]]
+        contents = [m.content for m in router_state["messages"] if isinstance(m, HumanMessage)]
         assert "3 더하기 4" in contents and "확장된 질의" in contents
         assert mock_cond.call_args[0][0]["next_agent"] == "math"
 
@@ -99,15 +127,18 @@ class TestCliCommon:
 
 
 class TestQueryRewriterCli:
-    @patch(
-        "scripts.cli.query_rewriter.rewrite",
-        return_value="지난주(2026-04-20~2026-04-26) 매출 알려줘",
-    )
+    @patch("scripts.cli.query_rewriter.rewrite")
     def test_prints_query_and_rewritten(
-        self, _mock_rw: MagicMock, capsys, monkeypatch
+        self, mock_rw: MagicMock, capsys, monkeypatch
     ) -> None:
         import scripts.cli.query_rewriter as cli
 
+        mock_rw.return_value = {
+            "messages": [HumanMessage(content="지난주(2026-04-20~2026-04-26) 매출 알려줘")],
+            "next_agent": "",
+            "chat_history": [],
+            "rewritten": "지난주(2026-04-20~2026-04-26) 매출 알려줘",
+        }
         monkeypatch.setattr(
             "sys.argv",
             ["prog", "지난주", "매출", "알려줘", "--now", "2026-04-29T14:30"],
@@ -122,15 +153,19 @@ class TestQueryRewriterCli:
 
 
 class TestQueryRewriterRouterCli:
-    @patch(
-        "scripts.cli.query_rewriter_router.route_trace",
-        return_value=("공장2의 제품 재고를 조사해줘", "tool_call_agent"),
-    )
+    @patch("scripts.cli.query_rewriter_router.route_trace")
     def test_prints_query_rewritten_destination(
-        self, _mock_rt: MagicMock, capsys, monkeypatch
+        self, mock_rt: MagicMock, capsys, monkeypatch
     ) -> None:
         import scripts.cli.query_rewriter_router as cli
 
+        mock_rt.return_value = {
+            "messages": [HumanMessage(content="공장2의 제품 재고를 조사해줘")],
+            "next_agent": "tool_call",
+            "chat_history": [],
+            "rewritten": "공장2의 제품 재고를 조사해줘",
+            "next_node": "tool_call_agent",
+        }
         monkeypatch.setattr(
             "sys.argv",
             [
@@ -149,3 +184,172 @@ class TestQueryRewriterRouterCli:
         assert "query      : 공장2" in out
         assert "rewritten  : 공장2의 제품 재고를 조사해줘" in out
         assert "destination: tool_call_agent" in out
+
+
+import re
+
+from scripts.eval import EvalCase, run_eval
+
+
+class TestRunEvalAssertions:
+    """op 추론 (str=eq, Pattern=regex, list[Pattern]=AND) 검증."""
+
+    @staticmethod
+    def _id_workflow(state: CliState) -> CliState:
+        """입력 state를 그대로 반환하는 항등 워크플로우 (어션만 검증할 때 사용)."""
+        return state
+
+    def test_eq_match_passes(self, capsys) -> None:
+        cases: list[EvalCase] = [
+            {
+                "id": "eq-pass",
+                "description": "eq pass",
+                "input": {"next_agent": "math"},
+                "expected": {"next_agent": "math"},
+            }
+        ]
+        assert run_eval(cases, self._id_workflow) == 0
+        assert "1/1 통과" in capsys.readouterr().out
+
+    def test_eq_mismatch_fails(self, capsys) -> None:
+        cases: list[EvalCase] = [
+            {
+                "id": "eq-fail",
+                "description": "eq fail",
+                "input": {"next_agent": "math"},
+                "expected": {"next_agent": "sql"},
+            }
+        ]
+        assert run_eval(cases, self._id_workflow) == 1
+        out = capsys.readouterr().out
+        assert "FAIL" in out and "0/1 통과" in out
+
+    def test_regex_pattern_matches(self, capsys) -> None:
+        cases: list[EvalCase] = [
+            {
+                "id": "regex-pass",
+                "description": "regex pass",
+                "input": {"rewritten": "2026-04-29 매출 알려줘"},
+                "expected": {"rewritten": re.compile(r"2026-04-29")},
+            }
+        ]
+        assert run_eval(cases, self._id_workflow) == 0
+
+    def test_list_of_patterns_requires_all(self, capsys) -> None:
+        # 둘 다 매치 → PASS
+        ok: list[EvalCase] = [
+            {
+                "id": "and-pass",
+                "description": "and pass",
+                "input": {"rewritten": "2026-04-20부터 2026-04-26"},
+                "expected": {
+                    "rewritten": [re.compile(r"2026-04-20"), re.compile(r"2026-04-26")],
+                },
+            }
+        ]
+        assert run_eval(ok, self._id_workflow) == 0
+        capsys.readouterr()  # drain
+
+        # 둘 중 하나라도 빠지면 FAIL
+        fail: list[EvalCase] = [
+            {
+                "id": "and-fail",
+                "description": "and fail",
+                "input": {"rewritten": "2026-04-20만 있음"},
+                "expected": {
+                    "rewritten": [re.compile(r"2026-04-20"), re.compile(r"2026-04-26")],
+                },
+            }
+        ]
+        assert run_eval(fail, self._id_workflow) == 1
+
+    def test_missing_field_fails(self, capsys) -> None:
+        cases: list[EvalCase] = [
+            {
+                "id": "missing",
+                "description": "missing",
+                "input": {},
+                "expected": {"next_node": "math_agent"},
+            }
+        ]
+        assert run_eval(cases, self._id_workflow) == 1
+        assert "<missing>" in capsys.readouterr().out
+
+
+class TestRunEvalRetry:
+    def test_retry_succeeds_on_second_attempt(self, capsys) -> None:
+        attempt_count = {"n": 0}
+
+        def flaky(state: CliState) -> CliState:
+            attempt_count["n"] += 1
+            return {**state, "rewritten": "ok" if attempt_count["n"] >= 2 else "no"}
+
+        cases: list[EvalCase] = [
+            {
+                "id": "flaky",
+                "description": "flaky",
+                "input": {},
+                "expected": {"rewritten": "ok"},
+            }
+        ]
+        assert run_eval(cases, flaky, max_retries=3) == 0
+        out = capsys.readouterr().out
+        assert "PASS" in out and "attempts=2" in out
+
+    def test_exception_does_not_retry(self, capsys) -> None:
+        attempt_count = {"n": 0}
+
+        def boom(state: CliState) -> CliState:
+            attempt_count["n"] += 1
+            raise RuntimeError("boom")
+
+        cases: list[EvalCase] = [
+            {
+                "id": "boom",
+                "description": "boom",
+                "input": {},
+                "expected": {"rewritten": "ok"},
+            }
+        ]
+        assert run_eval(cases, boom, max_retries=3) == 1
+        assert attempt_count["n"] == 1
+        out = capsys.readouterr().out
+        assert "error" in out and "RuntimeError: boom" in out
+
+
+class TestRunEvalNow:
+    @staticmethod
+    def _check_now_workflow(state: CliState) -> CliState:
+        from datetime import datetime
+        import src.query_rewriter.rewriter as rw_mod
+
+        return {**state, "rewritten": rw_mod.datetime.now().isoformat()}
+
+    def test_now_kwarg_applies_patched_now(self) -> None:
+        cases: list[EvalCase] = [
+            {
+                "id": "now",
+                "description": "now",
+                "input": {},
+                "expected": {"rewritten": "2026-04-29T14:30:00"},
+            }
+        ]
+        assert run_eval(cases, self._check_now_workflow, now="2026-04-29T14:30") == 0
+
+
+class TestRunEvalInputMerge:
+    @staticmethod
+    def _echo_workflow(state: CliState) -> CliState:
+        return state
+
+    def test_baseline_state_provides_empty_defaults(self) -> None:
+        # input에 messages/chat_history 미설정 → baseline empty가 사용됨
+        cases: list[EvalCase] = [
+            {
+                "id": "baseline",
+                "description": "baseline",
+                "input": {"next_agent": "sql"},
+                "expected": {"next_agent": "sql"},
+            }
+        ]
+        assert run_eval(cases, self._echo_workflow) == 0

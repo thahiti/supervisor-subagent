@@ -1,12 +1,9 @@
 """query_rewriter 워크플로우 스모크.
 
-`scripts.cli.query_rewriter.rewrite` 를 in-process로 직접 호출하고,
-반환 문자열에서 기대 정규식 패턴이 모두 발견되는지 검사한다.
-FIXED_NOW 로 상대 날짜 변환은 결정적이며, MAX_RETRIES 로 LLM 표현
-편차를 흡수한다. 실제 LLM을 호출하므로 비결정적·유료이며 의도적으로
-실행한다.
-
-`scripts/Test_query_rewriter.py` 를 subprocess-free 형태로 대체한다.
+`scripts.cli.query_rewriter.rewrite`를 공통 평가 프레임워크
+(`scripts.eval.run_eval`)로 호출한다. FIXED_NOW로 상대 날짜 변환은
+결정적이며, MAX_RETRIES로 LLM 표현 편차를 흡수한다. 실제 LLM을
+호출하므로 비결정적·유료이며 의도적으로 실행한다.
 
 실행:
     uv run python -m scripts.smoke_query_rewriter
@@ -16,138 +13,125 @@ from __future__ import annotations
 
 import re
 import sys
-from typing import NotRequired, TypedDict
 
 from dotenv import load_dotenv
 
 load_dotenv()
 
-from scripts.cli._common import Role, patched_now, to_messages  # noqa: E402
+from langchain_core.messages import HumanMessage  # noqa: E402
+
+from scripts.cli._common import to_messages  # noqa: E402
 from scripts.cli.query_rewriter import rewrite  # noqa: E402
+from scripts.eval import EvalCase, run_eval  # noqa: E402
 
 FIXED_NOW = "2026-04-29T14:30"
 MAX_RETRIES = 3
 
 
-class Case(TypedDict):
-    """리라이터 스모크 케이스."""
-
-    category: str
-    input: str
-    expected_patterns: list[str]
-    history: NotRequired[list[tuple[Role, str]]]
-
-
-CASES: list[Case] = [
-    {"category": "일:오늘", "input": "오늘 매출 알려줘", "expected_patterns": [r"2026-04-29"]},
-    {"category": "일:어제", "input": "어제 매출 알려줘", "expected_patterns": [r"2026-04-28"]},
+CASES: list[EvalCase] = [
     {
-        "category": "주:지난주",
-        "input": "지난주 매출 알려줘",
-        "expected_patterns": [r"2026-04-20", r"2026-04-26"],
+        "id": "일:오늘",
+        "description": "일:오늘",
+        "input": {"messages": [HumanMessage(content="오늘 매출 알려줘")]},
+        "expected": {"rewritten": re.compile(r"2026-04-29")},
     },
     {
-        "category": "월:지난달",
-        "input": "지난달 매출 알려줘",
-        "expected_patterns": [r"2026-03-01", r"2026-03-31"],
+        "id": "일:어제",
+        "description": "일:어제",
+        "input": {"messages": [HumanMessage(content="어제 매출 알려줘")]},
+        "expected": {"rewritten": re.compile(r"2026-04-28")},
     },
     {
-        "category": "최근:N일",
-        "input": "최근 7일 매출 알려줘",
-        "expected_patterns": [r"2026-04-22", r"2026-04-29"],
+        "id": "주:지난주",
+        "description": "주:지난주",
+        "input": {"messages": [HumanMessage(content="지난주 매출 알려줘")]},
+        "expected": {
+            "rewritten": [re.compile(r"2026-04-20"), re.compile(r"2026-04-26")],
+        },
     },
     {
-        "category": "년:작년",
-        "input": "작년 매출",
-        "expected_patterns": [r"2025-01-01", r"2025-12-31"],
+        "id": "월:지난달",
+        "description": "월:지난달",
+        "input": {"messages": [HumanMessage(content="지난달 매출 알려줘")]},
+        "expected": {
+            "rewritten": [re.compile(r"2026-03-01"), re.compile(r"2026-03-31")],
+        },
     },
     {
-        "category": "분기:1분기",
-        "input": "1분기 매출",
-        "expected_patterns": [r"2026-01-01", r"2026-03-31"],
+        "id": "최근:N일",
+        "description": "최근:N일",
+        "input": {"messages": [HumanMessage(content="최근 7일 매출 알려줘")]},
+        "expected": {
+            "rewritten": [re.compile(r"2026-04-22"), re.compile(r"2026-04-29")],
+        },
     },
     {
-        "category": "자연어:N월 N일",
-        "input": "4월 17일 매출",
-        "expected_patterns": [r"2026-04-17"],
+        "id": "년:작년",
+        "description": "년:작년",
+        "input": {"messages": [HumanMessage(content="작년 매출")]},
+        "expected": {
+            "rewritten": [re.compile(r"2025-01-01"), re.compile(r"2025-12-31")],
+        },
     },
     {
-        "category": "coref:번역 결과 → 이거",
-        "history": [
-            ("human", "Hello, how are you?를 한국어로 번역해줘"),
-            ("ai", "안녕하세요, 어떻게 지내세요?"),
-        ],
-        "input": "이거 일본어로도 번역해줘",
-        "expected_patterns": [r"안녕하세요|Hello"],
+        "id": "분기:1분기",
+        "description": "분기:1분기",
+        "input": {"messages": [HumanMessage(content="1분기 매출")]},
+        "expected": {
+            "rewritten": [re.compile(r"2026-01-01"), re.compile(r"2026-03-31")],
+        },
     },
     {
-        "category": "ellipsis:동사 재사용",
-        "history": [
-            ("human", "어제 매출 알려줘"),
-            ("ai", "2026-04-28 매출은 1억원입니다."),
-        ],
-        "input": "오늘은?",
-        "expected_patterns": [r"2026-04-29", r"매출"],
+        "id": "자연어:N월 N일",
+        "description": "자연어:N월 N일",
+        "input": {"messages": [HumanMessage(content="4월 17일 매출")]},
+        "expected": {"rewritten": re.compile(r"2026-04-17")},
     },
     {
-        "category": "독립:번역 → 수학 (오염 없음)",
-        "history": [
-            ("human", "Hello를 한국어로 번역해줘"),
-            ("ai", "안녕하세요"),
-        ],
-        "input": "3과 7을 더해줘",
-        "expected_patterns": [r"3.{0,5}7|7.{0,5}3", r"더해|더하|덧셈|합"],
+        "id": "coref:번역 결과 → 이거",
+        "description": "이거 → 직전 번역 결과 복원",
+        "input": {
+            "messages": [HumanMessage(content="이거 일본어로도 번역해줘")],
+            "chat_history": to_messages([
+                ("human", "Hello, how are you?를 한국어로 번역해줘"),
+                ("ai", "안녕하세요, 어떻게 지내세요?"),
+            ]),
+        },
+        "expected": {"rewritten": re.compile(r"안녕하세요|Hello")},
+    },
+    {
+        "id": "ellipsis:동사 재사용",
+        "description": "오늘은? → 직전 동사(매출) 복원 + 오늘 날짜",
+        "input": {
+            "messages": [HumanMessage(content="오늘은?")],
+            "chat_history": to_messages([
+                ("human", "어제 매출 알려줘"),
+                ("ai", "2026-04-28 매출은 1억원입니다."),
+            ]),
+        },
+        "expected": {
+            "rewritten": [re.compile(r"2026-04-29"), re.compile(r"매출")],
+        },
+    },
+    {
+        "id": "독립:번역 → 수학 (오염 없음)",
+        "description": "독립 질문은 chat_history 무시",
+        "input": {
+            "messages": [HumanMessage(content="3과 7을 더해줘")],
+            "chat_history": to_messages([
+                ("human", "Hello를 한국어로 번역해줘"),
+                ("ai", "안녕하세요"),
+            ]),
+        },
+        "expected": {
+            "rewritten": [
+                re.compile(r"3.{0,5}7|7.{0,5}3"),
+                re.compile(r"더해|더하|덧셈|합"),
+            ],
+        },
     },
 ]
 
 
-def run() -> int:
-    """모든 케이스를 in-process로 실행하고 PASS/FAIL을 출력한다."""
-    print(f"기준 시각 (FIXED_NOW): {FIXED_NOW}")
-    print(f"테스트 케이스: {len(CASES)}건\n")
-
-    pass_count = 0
-    for idx, case in enumerate(CASES, start=1):
-        history = to_messages(list(case.get("history", [])))
-
-        rewritten = ""
-        missing: list[str] = []
-        passed = False
-        error: str | None = None
-        attempts = 0
-        for attempt in range(1, MAX_RETRIES + 1):
-            attempts = attempt
-            try:
-                with patched_now(FIXED_NOW):
-                    rewritten = rewrite(case["input"], history)
-            except Exception as exc:
-                error = f"{type(exc).__name__}: {exc}"
-                break
-            missing = [
-                p for p in case["expected_patterns"] if not re.search(p, rewritten)
-            ]
-            passed = not missing
-            if passed:
-                break
-
-        if passed:
-            pass_count += 1
-        status = "PASS" if passed else "FAIL"
-        note = f" (attempts={attempts})" if attempts > 1 else ""
-        print(f"[{idx:02d}] [{status}] {case['category']}{note}")
-        print(f"     입력  : {case['input']}")
-        print(f"     출력  : {rewritten}")
-        print(f"     기대  : {case['expected_patterns']}")
-        if missing:
-            print(f"     누락  : {missing}")
-        if error is not None:
-            print(f"     에러  : {error}")
-        print()
-
-    total = len(CASES)
-    print(f"결과: {pass_count}/{total} 통과")
-    return 0 if pass_count == total else 1
-
-
 if __name__ == "__main__":
-    sys.exit(run())
+    sys.exit(run_eval(CASES, rewrite, now=FIXED_NOW, max_retries=MAX_RETRIES))

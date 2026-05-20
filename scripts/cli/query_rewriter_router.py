@@ -5,8 +5,7 @@
 안에서 독립적으로 수행한다 (cross-CLI import 없음).
 
 스모크 등 다른 호출자는 `from scripts.cli.query_rewriter_router import
-route_trace`로 in-process 호출해 (리라이팅된 질의, 라우팅 목적지)를
-직접 검증할 수 있다.
+route_trace`로 in-process 호출해 결과 state를 직접 검증할 수 있다.
 
 실행:
     uv run python -m scripts.cli.query_rewriter_router 3 곱하기 7
@@ -20,11 +19,12 @@ import argparse
 import sys
 
 from dotenv import load_dotenv
-from langchain_core.messages import BaseMessage, HumanMessage
+from langchain_core.messages import HumanMessage
 from langgraph.graph.message import add_messages
 
 import src  # noqa: F401  registry 등록 (router_conditional이 의존)
 from scripts.cli._common import (
+    CliState,
     add_common_args,
     last_human_text,
     parse_history,
@@ -32,42 +32,39 @@ from scripts.cli._common import (
 )
 from src.query_rewriter.rewriter import query_rewriter_node
 from src.router import router_conditional, router_node
-from src.state import State
 
 
-def route_trace(
-    query: str, chat_history: list[BaseMessage]
-) -> tuple[str, str]:
-    """query_rewriter → router를 연쇄 실행하고
-    (리라이팅된 질의, 라우팅된 목적지 노드명)을 반환한다.
+def route_trace(state: CliState) -> CliState:
+    """query_rewriter → router를 연쇄 실행하고 모든 결과 필드를 채운 새
+    ``CliState``를 반환한다.
 
-    리라이팅 단계는 query_rewriter CLI와 독립적으로 이 모듈 안에서
-    수행한다 (strict isolation; cross-CLI import 없음).
+    리라이팅 단계는 query_rewriter 모듈에 의존하지 않고 이 함수 안에서
+    독립적으로 수행한다 (strict isolation; cross-CLI import 없음).
+    결과 state에는 ``rewritten``, ``next_agent``, ``next_node``가 모두
+    채워진다.
 
     Args:
-        query: 현재 사용자 입력.
-        chat_history: 큐레이션된 과거 대화 메시지.
+        state: 입력 ``CliState``.
 
     Returns:
-        `(rewritten_query, destination_node_name)` 튜플.
-        destination은 에이전트의 node_name(예: `math_agent`) 또는
-        `response_generator`이다.
+        ``messages``가 누적되고 ``rewritten``/``next_agent``/``next_node``가
+        모두 채워진 새 ``CliState``.
     """
-    state: State = {
-        "messages": [HumanMessage(content=query)],
-        "next_agent": "",
-        "chat_history": chat_history,
-    }
-
     rw = query_rewriter_node(state)
-    state["messages"] = add_messages(state["messages"], rw["messages"])
-    rewritten = last_human_text(state["messages"], query)
+    msgs_after_rewrite = add_messages(state["messages"], rw["messages"])
+    rewritten_text = last_human_text(msgs_after_rewrite, "")
 
-    rt = router_node(state)
-    state["messages"] = add_messages(state["messages"], rt["messages"])
-    state["next_agent"] = rt["next_agent"]
+    state_for_router: CliState = {**state, "messages": msgs_after_rewrite}
+    rt = router_node(state_for_router)
+    msgs_after_router = add_messages(msgs_after_rewrite, rt["messages"])
 
-    return rewritten, router_conditional(state)
+    after_router: CliState = {
+        **state,
+        "messages": msgs_after_router,
+        "next_agent": rt["next_agent"],
+        "rewritten": rewritten_text,
+    }
+    return {**after_router, "next_node": router_conditional(after_router)}
 
 
 def main() -> None:
@@ -81,12 +78,18 @@ def main() -> None:
     query = " ".join(args.query)
     history = parse_history(args.history)
 
+    initial: CliState = {
+        "messages": [HumanMessage(content=query)],
+        "next_agent": "",
+        "chat_history": history,
+    }
+
     with patched_now(args.now):
-        rewritten, destination = route_trace(query, history)
+        result = route_trace(initial)
 
     print(f"query      : {query}")
-    print(f"rewritten  : {rewritten}")
-    print(f"destination: {destination}")
+    print(f"rewritten  : {result.get('rewritten', '')}")
+    print(f"destination: {result.get('next_node', '')}")
     sys.exit(0)
 
 
