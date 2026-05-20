@@ -1,10 +1,12 @@
-"""query_rewriter CLI subprocess 스모크.
+"""query_rewriter 워크플로우 스모크.
 
-scripts.cli.query_rewriter 를 --now 고정 시각으로 subprocess 호출하고,
-출력의 'rewritten:' 줄에서 기대 정규식 패턴이 모두 발견되는지 검사한다.
---now 로 상대 날짜 변환은 결정적이며, MAX_RETRIES 로 LLM 표현 편차를 흡수한다.
+`scripts.cli.query_rewriter.rewrite` 를 in-process로 직접 호출하고,
+반환 문자열에서 기대 정규식 패턴이 모두 발견되는지 검사한다.
+FIXED_NOW 로 상대 날짜 변환은 결정적이며, MAX_RETRIES 로 LLM 표현
+편차를 흡수한다. 실제 LLM을 호출하므로 비결정적·유료이며 의도적으로
+실행한다.
 
-scripts/Test_query_rewriter.py 를 CLI + subprocess 형태로 대체한다.
+`scripts/Test_query_rewriter.py` 를 subprocess-free 형태로 대체한다.
 
 실행:
     uv run python -m scripts.smoke_query_rewriter
@@ -12,11 +14,16 @@ scripts/Test_query_rewriter.py 를 CLI + subprocess 형태로 대체한다.
 
 from __future__ import annotations
 
-import json
 import re
-import subprocess
 import sys
 from typing import NotRequired, TypedDict
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+from scripts.cli._common import Role, patched_now, to_messages  # noqa: E402
+from scripts.cli.query_rewriter import rewrite  # noqa: E402
 
 FIXED_NOW = "2026-04-29T14:30"
 MAX_RETRIES = 3
@@ -28,7 +35,7 @@ class Case(TypedDict):
     category: str
     input: str
     expected_patterns: list[str]
-    history: NotRequired[list[dict[str, str]]]
+    history: NotRequired[list[tuple[Role, str]]]
 
 
 CASES: list[Case] = [
@@ -67,8 +74,8 @@ CASES: list[Case] = [
     {
         "category": "coref:번역 결과 → 이거",
         "history": [
-            {"role": "human", "content": "Hello, how are you?를 한국어로 번역해줘"},
-            {"role": "ai", "content": "안녕하세요, 어떻게 지내세요?"},
+            ("human", "Hello, how are you?를 한국어로 번역해줘"),
+            ("ai", "안녕하세요, 어떻게 지내세요?"),
         ],
         "input": "이거 일본어로도 번역해줘",
         "expected_patterns": [r"안녕하세요|Hello"],
@@ -76,8 +83,8 @@ CASES: list[Case] = [
     {
         "category": "ellipsis:동사 재사용",
         "history": [
-            {"role": "human", "content": "어제 매출 알려줘"},
-            {"role": "ai", "content": "2026-04-28 매출은 1억원입니다."},
+            ("human", "어제 매출 알려줘"),
+            ("ai", "2026-04-28 매출은 1억원입니다."),
         ],
         "input": "오늘은?",
         "expected_patterns": [r"2026-04-29", r"매출"],
@@ -85,8 +92,8 @@ CASES: list[Case] = [
     {
         "category": "독립:번역 → 수학 (오염 없음)",
         "history": [
-            {"role": "human", "content": "Hello를 한국어로 번역해줘"},
-            {"role": "ai", "content": "안녕하세요"},
+            ("human", "Hello를 한국어로 번역해줘"),
+            ("ai", "안녕하세요"),
         ],
         "input": "3과 7을 더해줘",
         "expected_patterns": [r"3.{0,5}7|7.{0,5}3", r"더해|더하|덧셈|합"],
@@ -94,45 +101,32 @@ CASES: list[Case] = [
 ]
 
 
-def _parse_rewritten(stdout: str) -> str:
-    """CLI stdout에서 'rewritten:' 줄의 값을 추출한다."""
-    for line in stdout.splitlines():
-        if line.startswith("rewritten"):
-            return line.split(":", 1)[1].strip()
-    return ""
-
-
 def run() -> int:
-    """모든 케이스를 실행하고 PASS/FAIL을 출력한다."""
-    print(f"기준 시각 (--now): {FIXED_NOW}")
+    """모든 케이스를 in-process로 실행하고 PASS/FAIL을 출력한다."""
+    print(f"기준 시각 (FIXED_NOW): {FIXED_NOW}")
     print(f"테스트 케이스: {len(CASES)}건\n")
 
     pass_count = 0
     for idx, case in enumerate(CASES, start=1):
-        cmd = [
-            sys.executable,
-            "-m",
-            "scripts.cli.query_rewriter",
-            case["input"],
-            "--now",
-            FIXED_NOW,
-        ]
-        history = case.get("history")
-        if history:
-            cmd += ["--history", json.dumps(history, ensure_ascii=False)]
+        history = to_messages(list(case.get("history", [])))
 
         rewritten = ""
         missing: list[str] = []
         passed = False
+        error: str | None = None
         attempts = 0
         for attempt in range(1, MAX_RETRIES + 1):
             attempts = attempt
-            proc = subprocess.run(cmd, capture_output=True, text=True)
-            rewritten = _parse_rewritten(proc.stdout)
+            try:
+                with patched_now(FIXED_NOW):
+                    rewritten = rewrite(case["input"], history)
+            except Exception as exc:
+                error = f"{type(exc).__name__}: {exc}"
+                break
             missing = [
                 p for p in case["expected_patterns"] if not re.search(p, rewritten)
             ]
-            passed = proc.returncode == 0 and not missing
+            passed = not missing
             if passed:
                 break
 
@@ -146,6 +140,8 @@ def run() -> int:
         print(f"     기대  : {case['expected_patterns']}")
         if missing:
             print(f"     누락  : {missing}")
+        if error is not None:
+            print(f"     에러  : {error}")
         print()
 
     total = len(CASES)

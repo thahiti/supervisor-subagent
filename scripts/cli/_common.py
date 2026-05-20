@@ -1,7 +1,11 @@
-"""query_rewriter 계열 CLI 공용 인자/파서.
+"""query_rewriter 계열 CLI 공용 인자/파서·메시지 유틸.
 
 첫 위치인자(query)는 nargs="+"로 받아 공백으로 이어 붙인다 →
 따옴표 없이 여러 단어를 그대로 입력할 수 있다.
+
+`Role`, `to_messages`, `last_human_text`는 두 CLI(`query_rewriter`,
+`query_rewriter_router`)와 스모크가 공유하는 CLI-tier 메시지 유틸이며,
+워크플로우 함수(`rewrite`, `route_trace`)는 각 CLI 모듈이 직접 소유한다.
 """
 
 from __future__ import annotations
@@ -10,12 +14,31 @@ import argparse
 import json
 from contextlib import contextmanager
 from datetime import datetime
-from typing import Iterator, cast
+from typing import Iterator, Literal, cast
 from unittest.mock import patch
 
-from langchain_core.messages import BaseMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 
-from evals.route_eval import Role, to_messages
+Role = Literal["human", "ai"]
+
+
+def to_messages(pairs: list[tuple[Role, str]]) -> list[BaseMessage]:
+    """(role, content) 쌍 리스트를 BaseMessage 리스트로 변환한다."""
+    out: list[BaseMessage] = []
+    for role, content in pairs:
+        if role == "human":
+            out.append(HumanMessage(content=content))
+        else:
+            out.append(AIMessage(content=content))
+    return out
+
+
+def last_human_text(messages: list[BaseMessage], default: str) -> str:
+    """messages에서 마지막 HumanMessage 본문을 반환한다 (없으면 default)."""
+    for msg in reversed(messages):
+        if isinstance(msg, HumanMessage):
+            return cast(str, msg.content)
+    return default
 
 
 def add_common_args(parser: argparse.ArgumentParser) -> None:
