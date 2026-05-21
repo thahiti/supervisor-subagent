@@ -28,4 +28,12 @@ MAX_RETRIES = 3
 
 if __name__ == "__main__":
     cases = load_examples(EXAMPLES_PATH)
-    sys.exit(run_eval(cases, rewrite, now=FIXED_NOW, max_retries=MAX_RETRIES))
+    sys.exit(
+        run_eval(
+            cases,
+            rewrite,
+            now=FIXED_NOW,
+            max_retries=MAX_RETRIES,
+            source=EXAMPLES_PATH,
+        )
+    )

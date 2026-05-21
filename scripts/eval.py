@@ -172,12 +172,34 @@ def _print_case(
     print()
 
 
+def _print_summary(
+    pass_count: int,
+    total: int,
+    failed: list[tuple[str, str]],
+    source: str | Path | None,
+) -> None:
+    """전체 실행 결과와 실패 케이스 요약을 마지막에 출력한다.
+
+    실패가 있으면 어느 YAML(``source``)의 어떤 케이스 id가, 어떤 사유로
+    FAIL했는지 한 줄씩 모아 보여준다. 사유는 어션 실패면 실패한 필드명,
+    예외면 ``error: <예외>``다.
+    """
+    print(f"결과: {pass_count}/{total} 통과")
+    if not failed:
+        return
+    label = f" — {source}" if source else ""
+    print(f"\n실패 케이스 {len(failed)}건{label}:")
+    for case_id, reason in failed:
+        print(f"  - {case_id}  ({reason})")
+
+
 def run_eval(
     cases: list[EvalCase],
     workflow: Callable[[CliState], CliState],
     *,
     now: str = "",
     max_retries: int = 1,
+    source: str | Path | None = None,
 ) -> int:
     """각 케이스를 워크플로우에 통과시키고 expected 어션을 검증한다.
 
@@ -187,12 +209,15 @@ def run_eval(
         now: 비어있지 않으면 ``patched_now(now)``로 전체 실행을 감싼다.
         max_retries: 어션 FAIL 시 케이스당 재시도 횟수 (기본 1 = 재시도 없음).
             예외는 재시도하지 않고 즉시 FAIL.
+        source: 케이스를 로드한 YAML 경로. 지정 시 마지막 실패 요약에
+            파일명을 함께 노출한다.
 
     Returns:
         모두 통과면 0, 하나라도 실패면 1.
     """
     total = len(cases)
     pass_count = 0
+    failed: list[tuple[str, str]] = []
 
     with patched_now(now):
         for idx, case in enumerate(cases, start=1):
@@ -215,6 +240,9 @@ def run_eval(
 
             if passed:
                 pass_count += 1
+            else:
+                reason = f"error: {error}" if error is not None else ", ".join(failures)
+                failed.append((case["id"], reason))
             _print_case(
                 idx,
                 total,
@@ -226,5 +254,5 @@ def run_eval(
                 error=error,
             )
 
-    print(f"결과: {pass_count}/{total} 통과")
+    _print_summary(pass_count, total, failed, source)
     return 0 if pass_count == total else 1

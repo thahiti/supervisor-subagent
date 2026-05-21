@@ -25,4 +25,4 @@ EXAMPLES_PATH = "scripts/examples/router.yml"
 
 if __name__ == "__main__":
     cases = load_examples(EXAMPLES_PATH)
-    sys.exit(run_eval(cases, route_trace))
+    sys.exit(run_eval(cases, route_trace, source=EXAMPLES_PATH))
