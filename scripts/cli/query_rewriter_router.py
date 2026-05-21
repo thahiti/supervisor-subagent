@@ -37,6 +37,15 @@ from src.query_rewriter.rewriter import query_rewriter_node
 from src.router import router_conditional, router_node
 
 
+_EXAMPLES = """예시 (그대로 복사해서 실행):
+  uv run python -m scripts.cli.query_rewriter_router 3 곱하기 7은 얼마야?
+  uv run python -m scripts.cli.query_rewriter_router 연봉이 5천만원 이상인 직원은 몇 명이야?
+  uv run python -m scripts.cli.query_rewriter_router 공장2 --history '[{"role":"human","content":"브랜치에서 제품 재고 조사해줘"},{"role":"ai","content":"어떤 브랜치?"}]'
+  uv run python -m scripts.cli.query_rewriter_router --examples scripts/examples/router.yml --list-examples
+  uv run python -m scripts.cli.query_rewriter_router --examples scripts/examples/router.yml --example single-sql
+"""
+
+
 def route_trace(state: CliState) -> CliState:
     """query_rewriter → router를 연쇄 실행하고 모든 결과 필드를 채운 새
     ``CliState``를 반환한다.
@@ -74,7 +83,11 @@ def main() -> None:
     """리라이터 → 라우터를 연쇄 실행하고 결과를 출력한다."""
     load_dotenv()
 
-    parser = argparse.ArgumentParser(description="query_rewriter + router 실행")
+    parser = argparse.ArgumentParser(
+        description="query_rewriter + router 실행",
+        epilog=_EXAMPLES,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     add_common_args(parser)
     args = parser.parse_args()
 

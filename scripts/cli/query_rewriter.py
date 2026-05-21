@@ -30,6 +30,15 @@ from scripts.eval import load_examples
 from src.query_rewriter.rewriter import query_rewriter_node
 
 
+_EXAMPLES = """예시 (그대로 복사해서 실행):
+  uv run python -m scripts.cli.query_rewriter 오늘 매출 알려줘
+  uv run python -m scripts.cli.query_rewriter 지난주 매출 알려줘 --now 2026-04-29T14:30
+  uv run python -m scripts.cli.query_rewriter 이거 일본어로도 번역해줘 --history '[{"role":"human","content":"Hello를 한국어로 번역해줘"},{"role":"ai","content":"안녕하세요"}]'
+  uv run python -m scripts.cli.query_rewriter --examples scripts/examples/rewriter.yml --list-examples
+  uv run python -m scripts.cli.query_rewriter --examples scripts/examples/rewriter.yml --example 주:지난주
+"""
+
+
 def rewrite(state: CliState) -> CliState:
     """query_rewriter_node를 실행하고 리라이팅 텍스트를 채운 새 state를 반환한다.
 
@@ -55,7 +64,11 @@ def main() -> None:
     """리라이터를 1회 실행하고 결과를 출력한다."""
     load_dotenv()
 
-    parser = argparse.ArgumentParser(description="query_rewriter 단독 실행")
+    parser = argparse.ArgumentParser(
+        description="query_rewriter 단독 실행",
+        epilog=_EXAMPLES,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     add_common_args(parser)
     args = parser.parse_args()
 
