@@ -24,10 +24,16 @@ class Repository:
     @classmethod
     def from_dir(cls, data_dir: str | Path) -> "Repository":
         """디렉터리 내 모든 *.json을 로드한다. 파일명(stem)이 테이블명."""
+        dir_path = Path(data_dir)
+        if not dir_path.exists():
+            raise FileNotFoundError(f"데이터 디렉터리가 없습니다: {data_dir}")
         tables: dict[str, list[dict[str, Any]]] = {}
-        for path in sorted(Path(data_dir).glob("*.json")):
+        for path in sorted(dir_path.glob("*.json")):
             with path.open(encoding="utf-8") as f:
-                tables[path.stem] = json.load(f)
+                data = json.load(f)
+            if not isinstance(data, list):
+                raise ValueError(f"{path.name}: JSON 최상위는 list여야 합니다")
+            tables[path.stem] = data
         return cls(tables)
 
     def all(self, table: str) -> list[dict[str, Any]]:

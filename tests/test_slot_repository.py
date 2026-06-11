@@ -52,3 +52,14 @@ class TestFromDir:
         )
         repo = Repository.from_dir(tmp_path)
         assert repo.all("widgets") == [{"id": 1, "name": "a"}]
+
+    def test_from_dir_missing_directory_raises(self, tmp_path) -> None:
+        with pytest.raises(FileNotFoundError):
+            Repository.from_dir(tmp_path / "does_not_exist")
+
+    def test_from_dir_rejects_non_list_json(self, tmp_path) -> None:
+        (tmp_path / "bad.json").write_text(
+            json.dumps({"id": 1}), encoding="utf-8"
+        )
+        with pytest.raises(ValueError):
+            Repository.from_dir(tmp_path)
