@@ -1,0 +1,32 @@
+[
+  {
+    "branch_id": 11,
+    "month": "2026-01",
+    "amount": 1200
+  },
+  {
+    "branch_id": 11,
+    "month": "2026-02",
+    "amount": 1500
+  },
+  {
+    "branch_id": 11,
+    "month": "2026-03",
+    "amount": 1800
+  },
+  {
+    "branch_id": 12,
+    "month": "2026-01",
+    "amount": 800
+  },
+  {
+    "branch_id": 12,
+    "month": "2026-02",
+    "amount": 950
+  },
+  {
+    "branch_id": 21,
+    "month": "2026-01",
+    "amount": 2200
+  }
+]

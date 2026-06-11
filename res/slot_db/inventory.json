@@ -1,0 +1,14 @@
+[
+  {
+    "product_id": 101,
+    "stock": 34
+  },
+  {
+    "product_id": 102,
+    "stock": 12
+  },
+  {
+    "product_id": 201,
+    "stock": 240
+  }
+]

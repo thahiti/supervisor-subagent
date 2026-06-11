@@ -1,0 +1,17 @@
+[
+  {
+    "id": 11,
+    "country_id": 1,
+    "name": "강남점"
+  },
+  {
+    "id": 12,
+    "country_id": 1,
+    "name": "부산점"
+  },
+  {
+    "id": 21,
+    "country_id": 2,
+    "name": "도쿄점"
+  }
+]

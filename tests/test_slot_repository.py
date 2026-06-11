@@ -63,3 +63,17 @@ class TestFromDir:
         )
         with pytest.raises(ValueError):
             Repository.from_dir(tmp_path)
+
+
+class TestGeneratedData:
+    """scripts/gen_slot_db.py 산출물이 기대 구조로 로드되는지 검증."""
+
+    def test_default_repository_loads_all_tables(self) -> None:
+        from src.slot_agent.repository import Repository, _DEFAULT_DATA_DIR
+
+        repo = Repository.from_dir(_DEFAULT_DATA_DIR)
+        assert len(repo.all("countries")) == 2
+        assert len(repo.where("branches", country_id=1)) == 2
+        assert len(repo.all("products")) == 3
+        assert repo.where("inventory", product_id=101)[0]["stock"] == 34
+        assert len(repo.where("signups", channel_id=1, month="2026-01")) == 1

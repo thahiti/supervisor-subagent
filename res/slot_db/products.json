@@ -1,0 +1,17 @@
+[
+  {
+    "id": 101,
+    "category_id": 1,
+    "name": "노트북"
+  },
+  {
+    "id": 102,
+    "category_id": 1,
+    "name": "모니터"
+  },
+  {
+    "id": 201,
+    "category_id": 2,
+    "name": "원두커피"
+  }
+]
