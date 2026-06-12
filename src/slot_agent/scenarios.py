@@ -96,6 +96,7 @@ def _get_signups(repo: Repository, slots: dict) -> dict:
     channels = repo.where("channels", id=slots["channel"])
     name = channels[0]["name"] if channels else str(slots["channel"])
     rows = repo.where("signups", channel_id=slots["channel"], month=slots["month"])
+    # 해당 채널·월에 데이터가 없으면 가입자 0명으로 간주한다(명시적 합의).
     count = rows[0]["count"] if rows else 0
     return {
         "label": "신규 가입자 수",
