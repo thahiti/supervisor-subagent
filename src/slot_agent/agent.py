@@ -62,6 +62,20 @@ def _no_match_message() -> str:
     return "\n".join(lines)
 
 
+def _object_particle(word: str) -> str:
+    """한국어 목적격 조사(을/를)를 단어의 끝 글자 받침 유무로 고른다.
+
+    끝 글자가 한글이 아니면 기본값 '를'을 사용한다.
+    """
+    if not word:
+        return "를"
+    last = word[-1]
+    if "가" <= last <= "힣":
+        has_final = (ord(last) - 0xAC00) % 28 != 0
+        return "을" if has_final else "를"
+    return "를"
+
+
 def _format_ask(ask: AskSlot) -> str:
     """다음 빈 슬롯을 묻는 메시지. 후보값이 있으면 표로 제시(grounding)."""
     slot = ask.slot
@@ -72,8 +86,9 @@ def _format_ask(ask: AskSlot) -> str:
         (c.get(slot.value_key), c.get(slot.label_key)) for c in ask.candidates
     ]
     table = to_markdown_table(columns, rows)
+    particle = _object_particle(slot.description)
     return (
-        f"어떤 {slot.description}를 조회할까요? 아래에서 골라 알려주세요.\n\n"
+        f"어떤 {slot.description}{particle} 조회할까요? 아래에서 골라 알려주세요.\n\n"
         f"{table}"
     )
 
@@ -123,6 +138,8 @@ def slot_wrapper(state: State) -> dict:
     if isinstance(outcome, AskSlot):
         return _emit(_format_ask(outcome))
 
-    assert isinstance(outcome, Ready)
+    if not isinstance(outcome, Ready):  # 방어 코드 — 이론상 도달 불가
+        logger.error("resolve 반환 타입 오류: %r", outcome)
+        return _emit(_no_match_message())
     result = scenario.metric(repo, outcome.slots)
     return _emit(_format_result(scenario, result))

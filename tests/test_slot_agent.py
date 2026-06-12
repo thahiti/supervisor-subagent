@@ -114,4 +114,16 @@ class TestFreeSlot:
             {"scenario_id": "new_signups", "slots": {"channel": "검색광고"}}
         )
         content = slot_wrapper(_state("검색광고 가입자"))["messages"][-1].content
-        assert "월" in content
+        assert "조회 월(YYYY-MM)" in content
+        assert "값을 알려주세요" in content
+
+
+def test_object_particle_picks_correct_josa() -> None:
+    from src.slot_agent.agent import _object_particle
+
+    assert _object_particle("지점") == "을"   # 받침 있음
+    assert _object_particle("나라") == "를"   # 받침 없음
+    assert _object_particle("제품") == "을"
+    assert _object_particle("채널") == "을"
+    assert _object_particle("AB") == "를"     # 비한글 → 기본값
+    assert _object_particle("") == "를"
