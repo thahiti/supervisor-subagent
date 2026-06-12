@@ -127,3 +127,14 @@ def test_object_particle_picks_correct_josa() -> None:
     assert _object_particle("채널") == "을"
     assert _object_particle("AB") == "를"     # 비한글 → 기본값
     assert _object_particle("") == "를"
+
+
+class TestRegistration:
+    def test_slot_agent_registered_in_global_registry(self) -> None:
+        import src  # noqa: F401 - src/__init__.py가 모든 에이전트를 등록
+        from src.registry import registry
+
+        entry = registry.get("slot")
+        assert entry is not None
+        assert entry.node_name == "slot_agent"
+        assert "슬롯" in entry.description or "조회" in entry.description
