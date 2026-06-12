@@ -4,10 +4,35 @@
 공통 파라미터 조정이 필요하면 이 파일만 수정하면 된다.
 """
 
+import os
+
+from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 
 DEFAULT_CHAT_MODEL = "gpt-4o-mini"
 DEFAULT_TEMPERATURE = 0.0
+
+
+def _get_api_key() -> str:
+    """.env를 로드한 뒤 OPENAI_API_KEY를 반환한다.
+
+    엔트리포인트(main.py 등)에서 load_dotenv()를 호출하지 않은 경로(테스트,
+    스크립트, 직접 import)에서도 키가 적용되도록 이 팩토리에서 직접 로드한다.
+
+    Returns:
+        OPENAI_API_KEY 값.
+
+    Raises:
+        RuntimeError: 환경 변수와 .env 어디에도 키가 없을 때.
+    """
+    load_dotenv()
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError(
+            "OPENAI_API_KEY가 설정되지 않았습니다. "
+            ".env 파일에 OPENAI_API_KEY를 추가하세요 (.env.example 참고)."
+        )
+    return api_key
 
 
 def get_chat_model(
@@ -26,4 +51,5 @@ def get_chat_model(
     return ChatOpenAI(
         model=model or DEFAULT_CHAT_MODEL,
         temperature=temperature if temperature is not None else DEFAULT_TEMPERATURE,
+        api_key=_get_api_key(),
     )
