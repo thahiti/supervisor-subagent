@@ -13,6 +13,7 @@ import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
 from src.query_rewriter.prompt import (
+    _format_conversation,
     _format_dictionary,
     build_rewriter_system_prompt,
 )
@@ -49,6 +50,33 @@ class TestPrompt:
         result = _format_dictionary({"A": "B", "C": "D"})
         assert "A → B" in result
         assert "C → D" in result
+
+    def test_build_prompt_includes_conversation(self) -> None:
+        now = datetime(2026, 4, 20, 14, 30)
+        chat_history = [
+            HumanMessage(content="과거 질의"),
+            AIMessage(content="과거 출력"),
+        ]
+        prompt = build_rewriter_system_prompt(now, chat_history=chat_history)
+        assert "과거 질의" in prompt
+        assert "과거 출력" in prompt
+
+    def test_build_prompt_without_conversation_marks_none(self) -> None:
+        now = datetime(2026, 4, 20, 14, 30)
+        prompt = build_rewriter_system_prompt(now)
+        # 대화 내용 섹션이 존재하고, 비어 있으면 "없음"으로 표시된다.
+        assert "이전 대화 내용" in prompt
+
+    def test_format_conversation_empty(self) -> None:
+        assert _format_conversation([]) == "없음"
+
+    def test_format_conversation_labels_roles(self) -> None:
+        result = _format_conversation([
+            HumanMessage(content="안녕"),
+            AIMessage(content="반가워요"),
+        ])
+        assert "사용자: 안녕" in result
+        assert "에이전트: 반가워요" in result
 
 
 class TestFindLastHumanMessage:
@@ -154,11 +182,13 @@ class TestQueryRewriterNode:
         query_rewriter_node(state)
 
         call_args = mock_llm.invoke.call_args[0][0]
-        # SystemMessage + chat_history 2개 + 현재 HumanMessage = 4개
-        assert len(call_args) == 4
-        assert call_args[1].content == "과거 질의"
-        assert call_args[2].content == "과거 출력"
-        assert call_args[3].content == "현재 질의"
+        # 대화 이력은 시스템 프롬프트에 삽입되므로
+        # SystemMessage + 현재 HumanMessage = 2개
+        assert len(call_args) == 2
+        system_prompt = call_args[0].content
+        assert "과거 질의" in system_prompt
+        assert "과거 출력" in system_prompt
+        assert call_args[1].content == "현재 질의"
 
 
 class TestPromptConfirmationRule:

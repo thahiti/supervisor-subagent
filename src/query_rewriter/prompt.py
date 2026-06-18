@@ -2,6 +2,8 @@
 
 from datetime import date, datetime, timedelta
 
+from langchain_core.messages import BaseMessage, HumanMessage
+
 
 WEEKDAY_NAMES = ["월", "화", "수", "목", "금", "토", "일"]
 
@@ -11,6 +13,21 @@ def _format_dictionary(dictionary: dict[str, str]) -> str:
     if not dictionary:
         return "없음"
     return "\n".join(f"- {term} → {definition}" for term, definition in dictionary.items())
+
+
+def _format_conversation(chat_history: list[BaseMessage]) -> str:
+    """대화 이력을 프롬프트에 삽입할 역할 라벨 문자열로 변환한다.
+
+    HumanMessage는 "사용자", 그 외(AIMessage 등)는 "에이전트"로 표기한다.
+    이력이 없으면 "없음"을 반환한다.
+    """
+    if not chat_history:
+        return "없음"
+    lines = []
+    for msg in chat_history:
+        role = "사용자" if isinstance(msg, HumanMessage) else "에이전트"
+        lines.append(f"{role}: {msg.content}")
+    return "\n".join(lines)
 
 
 def _format_weekday_table(monday: date) -> str:
@@ -125,12 +142,14 @@ def _compute_reference_dates(now: datetime) -> dict[str, str]:
 def build_rewriter_system_prompt(
     now: datetime,
     dictionary: dict[str, str] | None = None,
+    chat_history: list[BaseMessage] | None = None,
 ) -> str:
-    """현재 시각과 용어 사전을 반영한 쿼리 리라이터 시스템 프롬프트를 생성한다.
+    """현재 시각·용어 사전·대화 이력을 반영한 쿼리 리라이터 시스템 프롬프트를 생성한다.
 
     Args:
         now: 현재 시각. 상대적 시간 표현 해석의 기준이 된다.
         dictionary: 용어 사전. None이면 용어 치환 규칙이 "없음"으로 표시.
+        chat_history: 큐레이션된 과거 대화. None/빈 리스트면 "없음"으로 표시.
 
     Returns:
         시스템 프롬프트 문자열.
@@ -139,6 +158,7 @@ def build_rewriter_system_prompt(
     return REWRITER_SYSTEM_PROMPT.format(
         now=now.strftime("%Y-%m-%d %H:%M (%A)"),
         dictionary=_format_dictionary(dictionary or {}),
+        conversation=_format_conversation(chat_history or []),
         **refs,
     )
 
@@ -151,6 +171,10 @@ REWRITER_SYSTEM_PROMPT = """당신은 사용자 쿼리를 명확하게 재작성
 
 ## 현재 시각
 {now}
+
+## 이전 대화 내용
+아래는 큐레이션된 과거 대화입니다(없으면 "없음"). 현재 사용자 메시지의 모호한 지시어를 풀 때만 참고하세요.
+{conversation}
 
 ## 역할
 아래 3가지 규칙을 적용하여 사용자의 마지막 메시지를 재작성하세요.
@@ -199,7 +223,7 @@ REWRITER_SYSTEM_PROMPT = """당신은 사용자 쿼리를 명확하게 재작성
 "최근 N일"은 N의 값에 따라 (오늘 - N일) ~ 오늘로 직접 계산하세요. 오늘은 {today}입니다.
 
 ### 2. 대화 맥락 보충 (명확화 규칙 미포함)
-이전 턴들의 대화(시스템 메시지 다음에 주어지는 사용자/어시스턴트 메시지 쌍)는 큐레이션된 과거 대화입니다. 이를 참고하여 현재 사용자 메시지의 모호한 지시어를 구체적으로 바꿔주세요:
+위 "이전 대화 내용" 섹션에 정리된 과거 대화(사용자/에이전트 발화)를 참고하여 현재 사용자 메시지의 모호한 지시어를 구체적으로 바꿔주세요:
 
 **중요**: 모호함을 명확화하려고 시도하지 마세요. chat_history에서 맥락을 찾을 수 없으면, 모호함을 풀려고 하기보다 사용자의 원래 표현을 그대로 유지하세요. 명확화는 다운스트림 에이전트의 책임입니다.
 - "이거", "그거", "저거" → 지칭하는 대상을 명시

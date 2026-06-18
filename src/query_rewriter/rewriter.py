@@ -52,14 +52,16 @@ def query_rewriter_node(state: State) -> dict:
         dictionary = {k: v for k, v in lookup_result.items() if v}
         logger.info("토큰 조회: %s → %s", tokens, dictionary)
 
-    system_prompt = build_rewriter_system_prompt(now=datetime.now(), dictionary=dictionary)
+    chat_history = state.get("chat_history", [])
+    system_prompt = build_rewriter_system_prompt(
+        now=datetime.now(),
+        dictionary=dictionary,
+        chat_history=list(chat_history),
+    )
     llm = get_chat_model()
 
-    chat_history = state.get("chat_history", [])
     response = llm.invoke(
-        [SystemMessage(content=system_prompt)]
-        + list(chat_history)
-        + [HumanMessage(content=original)],
+        [SystemMessage(content=system_prompt), HumanMessage(content=original)],
     )
 
     rewritten: str = response.content  # type: ignore[assignment]
