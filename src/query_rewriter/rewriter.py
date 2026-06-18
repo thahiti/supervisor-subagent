@@ -60,6 +60,10 @@ def query_rewriter_node(state: State) -> dict:
     )
     llm = get_chat_model()
 
+    logger.info("================================================")
+    logger.info("system_prompt: %s", system_prompt)
+    logger.info("================================================")
+
     response = llm.invoke(
         [SystemMessage(content=system_prompt), HumanMessage(content=original)],
     )
@@ -69,6 +73,6 @@ def query_rewriter_node(state: State) -> dict:
 
     if rewritten.strip() == original.strip():
         logger.info("변경 없음 → 원본 유지")
-        return {"messages": []}
+        return {"rewritten_query": original}
 
-    return {"messages": [HumanMessage(content=rewritten)]}
+    return {"query": original, "rewritten_query": rewritten}

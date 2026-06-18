@@ -15,9 +15,11 @@ class State(TypedDict):
             (리라이팅된 사용자 질의 HumanMessage, 최종 출력 AIMessage) 2개가
             operator.add 리듀서로 누적된다.
     """
-
-    messages: Annotated[list[BaseMessage], add_messages]
+    query: str
+    rewritten_query: str
     next_agent: str
+    reason: str
+    messages: Annotated[list[BaseMessage], add_messages]
     chat_history: Annotated[list[BaseMessage], operator.add]
 
 

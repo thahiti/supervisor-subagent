@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from langchain_core.messages import AIMessage, SystemMessage
+from langchain_core.messages import AIMessage, SystemMessage, HumanMessage
 
 from src.registry import registry
 from src.llm import get_chat_model
@@ -108,7 +108,7 @@ def slot_wrapper(state: State) -> dict:
     """declarative 시나리오 기반 슬롯 채우기 조회를 처리한다."""
     llm = get_chat_model()
     system_prompt = build_system_prompt(scenario_registry)
-    messages = [SystemMessage(content=system_prompt)] + state["messages"]
+    messages = [SystemMessage(content=system_prompt)] + [HumanMessage(content=state.get("rewritten_query", ""))]
 
     logger.info("LLM 호출 시작 (scenarios=%d)", len(scenario_registry.scenarios))
     try:

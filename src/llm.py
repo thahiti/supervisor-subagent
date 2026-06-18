@@ -9,7 +9,7 @@ import os
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 
-DEFAULT_CHAT_MODEL = "gpt-4o-mini"
+DEFAULT_CHAT_MODEL = "gpt-4o"
 DEFAULT_TEMPERATURE = 0.0
 
 

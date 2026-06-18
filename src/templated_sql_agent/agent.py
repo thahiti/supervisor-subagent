@@ -108,10 +108,10 @@ def _run_lookups(
     return "\n\n".join(blocks)
 
 
-@registry.agent(
-    "templated_sql",
-    description=template_registry.build_router_description(),
-)
+#@registry.agent(
+#    "templated_sql",
+#    description=template_registry.build_router_description(),
+#)
 @log_node("templated_sql")
 def templated_sql_wrapper(state: State) -> dict:
     """사전 정의된 SQL 템플릿 기반 조회를 처리한다."""
