@@ -25,12 +25,27 @@ def test_prompt_embeds_catalog() -> None:
     assert "country" in prompt and "branch" in prompt
 
 
-def test_prompt_specifies_json_output() -> None:
+def test_prompt_names_extraction_targets() -> None:
     prompt = build_system_prompt(_registry())
-    assert '"scenario_id"' in prompt
-    assert '"slots"' in prompt
+    # 구조화 출력 스키마와 짝을 이루는 추출 항목을 언급해야 한다.
+    assert "scenario_id" in prompt
+    assert "slots" in prompt
+
+
+def test_prompt_does_not_instruct_json_output() -> None:
+    prompt = build_system_prompt(_registry())
+    # 더 이상 LLM에게 JSON을 출력하라고 지시하지 않는다(구조화 출력으로 대체).
+    assert "JSON" not in prompt
 
 
 def test_prompt_forbids_guessing() -> None:
     prompt = build_system_prompt(_registry())
     assert "추측" in prompt or "임의" in prompt
+
+
+def test_slot_extraction_schema_defaults() -> None:
+    from src.slot_agent.prompt import SlotExtraction
+
+    e = SlotExtraction()
+    assert e.scenario_id is None
+    assert e.slots == {}
