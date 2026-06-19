@@ -114,9 +114,10 @@ class TestQueryRewriterNode:
         }
 
         result = query_rewriter_node(state)
-        assert len(result["messages"]) == 1
-        assert isinstance(result["messages"][0], HumanMessage)
-        assert "2026-04-13" in result["messages"][0].content
+        # 리라이팅 결과는 messages가 아니라 rewritten_query에 기록된다.
+        assert result["rewritten_query"] == "2026-04-13~2026-04-19 매출 알려줘"
+        assert result["query"] == "지난주 매출 알려줘"
+        assert "messages" not in result
 
     @patch("src.query_rewriter.rewriter.get_chat_model")
     def test_skips_when_no_change(self, mock_get_model: MagicMock) -> None:
@@ -132,7 +133,9 @@ class TestQueryRewriterNode:
         }
 
         result = query_rewriter_node(state)
-        assert result["messages"] == []
+        # 변경이 없으면 원본을 rewritten_query로 그대로 둔다(messages 미반환).
+        assert result["rewritten_query"] == original
+        assert "messages" not in result
 
     def test_skips_when_no_human_message(self) -> None:
         state = {
@@ -222,9 +225,8 @@ class TestPromptUserPersona:
         # 질문/요청 형태 강제가 명시되어야 한다.
         assert "질문" in prompt and "요청" in prompt
 
-    def test_prompt_forbids_agent_clarification_form(self) -> None:
+    def test_prompt_marks_clarification_excluded(self) -> None:
         prompt = build_rewriter_system_prompt(datetime(2026, 5, 13, 9, 0))
-        # 리라이터가 사용자에게 되묻는 형식 금지가 명시되어야 한다.
-        assert "되묻" in prompt
-        # 명확화 책임이 다운스트림에 있음을 명시해야 한다.
-        assert "명확화" in prompt or "다운스트림" in prompt
+        # 명확화(되묻기)는 리라이터의 책임이 아님이 명시되어야 한다.
+        assert "명확화" in prompt
+        assert "미포함" in prompt or "생성하지 않는다" in prompt
